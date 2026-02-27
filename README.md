@@ -4,9 +4,9 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Knowledge Assistant                  │
+│                     Knowledge Assistant                 │
 │                                                         │
-│   📝 Заметки          🔍 Поиск           🏥 Здоровье    │
+│   📝 Заметки         🔍 Поиск          🏥 Здоровье    │
 │   ─────────────       ─────────────      ─────────────  │
 │   .md upload          Семантический      PDF анализов   │
 │   CodeMirror          sqlite-vec         Метрики        │
@@ -48,7 +48,7 @@ Browser
 │                                                  │
 │  argon2 ──► password hashing                     │
 │  jsonwebtoken ──► JWT encode / decode            │
-│  aes-gcm ──► AES-256-GCM (notes & health data)  │
+│  aes-gcm ──► AES-256-GCM (notes & health data)   │
 │  reqwest ──► Anthropic API calls                 │
 └────────────────────┬─────────────────────────────┘
                      │ sqlx (compile-time checked)
