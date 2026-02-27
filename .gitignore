@@ -1,16 +1,13 @@
-@"
 # Environment
 .env
 .env.local
 .env.prod
-.env.example
 
 # Rust
 apps/api/target/
 
 # Node
 node_modules/
-apps/web/node_modules/
 apps/web/dist/
 
 # Database
@@ -22,4 +19,7 @@ data/
 # OS
 .DS_Store
 Thumbs.db
-"@ | Out-File -FilePath ".gitignore" -Encoding utf8
+
+# Claude
+.claude/
+CLAUDE.md

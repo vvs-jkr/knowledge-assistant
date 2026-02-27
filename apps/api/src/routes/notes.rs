@@ -1,7 +1,7 @@
 use axum::Router;
-use sqlx::SqlitePool;
+use crate::config::AppState;
 
-pub fn router() -> Router<SqlitePool> {
+pub fn router() -> Router<AppState> {
     Router::new()
     // эндпоинты добавим в Phase 2
 }
