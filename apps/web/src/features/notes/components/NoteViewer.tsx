@@ -1,0 +1,116 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { downloadNote, useDeleteNote, useNote } from '@/features/notes/api/notes.api'
+import { useNotesStore } from '@/features/notes/store/notes.store'
+import { Download, Edit, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+
+export function NoteViewer() {
+  const selectedNoteId = useNotesStore((s) => s.selectedNoteId)
+  const selectNote = useNotesStore((s) => s.selectNote)
+  const setEditing = useNotesStore((s) => s.setEditing)
+  const deleteNote = useDeleteNote()
+  const { data: note, isLoading } = useNote(selectedNoteId)
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 p-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-4/6" />
+      </div>
+    )
+  }
+
+  if (!note) return null
+
+  const frontmatterEntries = note.frontmatter
+    ? Object.entries(note.frontmatter).filter(
+        (entry): entry is [string, string | number] =>
+          typeof entry[1] === 'string' || typeof entry[1] === 'number'
+      )
+    : []
+
+  const handleDelete = () => {
+    deleteNote.mutate(note.id, {
+      onSuccess: () => {
+        selectNote(null)
+        toast.success('Note deleted')
+      },
+      onError: () => toast.error('Failed to delete note'),
+    })
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center justify-between border-b px-6 py-3">
+        <h2 className="truncate text-lg font-semibold">{note.filename}</h2>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() =>
+              void downloadNote(note.id, note.filename).catch(() => toast.error('Download failed'))
+            }
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setEditing(true)}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete note?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  &ldquo;{note.filename}&rdquo; will be permanently deleted. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+
+      {frontmatterEntries.length > 0 && (
+        <div className="flex shrink-0 flex-wrap gap-2 border-b px-6 py-2">
+          {frontmatterEntries.map(([k, v]) => (
+            <Badge key={k} variant="secondary" className="text-xs">
+              {k}: {String(v)}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto p-6">
+        <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{note.content}</pre>
+      </div>
+    </div>
+  )
+}

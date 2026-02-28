@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO note_files\n               (id, user_id, filename, mime_type, size_bytes, encrypted_content, nonce, frontmatter, created_at, updated_at)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "6982d6220e70490f967c04a24aeaf04fa52a1a8a097dbe1353638ea1bcdf2e5e"
+}

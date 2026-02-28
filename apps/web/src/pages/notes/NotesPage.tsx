@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { useLogout } from '@/features/auth/api/auth.api'
 import { useAuthStore } from '@/features/auth/store/auth.store'
+import { NotesMainPanel } from '@/features/notes/components/NotesMainPanel'
+import { NotesSidebar } from '@/features/notes/components/NotesSidebar'
 import { ThemeToggle } from '@/shared/ui/ThemeToggle'
 import { useNavigate } from 'react-router-dom'
 
@@ -14,8 +16,8 @@ export function NotesPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b px-6 py-3 flex items-center justify-between">
+    <div className="flex h-screen flex-col">
+      <header className="flex shrink-0 items-center justify-between border-b px-6 py-3">
         <span className="font-semibold">Knowledge Assistant</span>
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">{user?.email}</span>
@@ -25,9 +27,14 @@ export function NotesPage() {
           </Button>
         </div>
       </header>
-      <main className="flex flex-1 items-center justify-center text-muted-foreground">
-        Notes — Phase 2
-      </main>
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-r">
+          <NotesSidebar />
+        </aside>
+        <main className="flex flex-1 overflow-hidden">
+          <NotesMainPanel />
+        </main>
+      </div>
     </div>
   )
 }

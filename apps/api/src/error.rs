@@ -13,6 +13,10 @@ pub enum AppError {
     Unauthorized,
     #[error("Bad request: {0}")]
     BadRequest(String),
+    #[error("Conflict: {0}")]
+    Conflict(String),
+    #[error("Payload too large")]
+    PayloadTooLarge,
     #[error("Internal error")]
     Internal(#[from] anyhow::Error),
 }
@@ -24,6 +28,8 @@ impl IntoResponse for AppError {
             Self::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
+            Self::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
+            Self::PayloadTooLarge => (StatusCode::PAYLOAD_TOO_LARGE, self.to_string()),
             Self::Internal(e) => {
                 tracing::error!("Internal error: {e:?}");
                 (

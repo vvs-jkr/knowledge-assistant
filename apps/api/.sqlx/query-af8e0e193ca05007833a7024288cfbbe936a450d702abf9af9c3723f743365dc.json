@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE note_files\n           SET encrypted_content = ?, nonce = ?, size_bytes = ?, frontmatter = ?,\n               filename = ?, updated_at = ?\n           WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "af8e0e193ca05007833a7024288cfbbe936a450d702abf9af9c3723f743365dc"
+}

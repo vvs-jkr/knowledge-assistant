@@ -1,0 +1,28 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT filename, mime_type, created_at FROM note_files WHERE id = ? AND user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "filename",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "mime_type",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [false, false, false]
+  },
+  "hash": "bd9e5e61be8665364d326ee694ee31029d53ff7226249c32e6663a36b2968ef3"
+}
