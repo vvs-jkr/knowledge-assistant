@@ -1,17 +1,12 @@
-use axum::{
-    async_trait,
-    extract::FromRequestParts,
-    http::request::Parts,
-};
+use axum::{async_trait, extract::FromRequestParts, http::request::Parts};
 
 use crate::{
-    auth::{Claims, verify_access_token},
+    auth::{verify_access_token, Claims},
     config::AppState,
     error::AppError,
 };
 
-/// Extractor для защищённых routes.
-/// Добавь `AuthUser(claims): AuthUser` в параметры handler'а — и роут становится защищённым.
+// Добавь `AuthUser(claims): AuthUser` в параметры handler'а — и роут становится защищённым.
 pub struct AuthUser(pub Claims);
 
 #[async_trait]

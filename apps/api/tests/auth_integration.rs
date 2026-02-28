@@ -1,7 +1,7 @@
 use axum::http::{HeaderValue, StatusCode};
 use axum_test::TestServer;
 use knowledge_api::{build_app, build_test_state};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,7 +68,10 @@ async fn register_duplicate_email_fails() {
 
     res.assert_status(StatusCode::BAD_REQUEST);
     let body = res.json::<Value>();
-    assert!(body["error"].as_str().unwrap().contains("already registered"));
+    assert!(body["error"]
+        .as_str()
+        .unwrap()
+        .contains("already registered"));
 }
 
 #[tokio::test]
@@ -141,7 +144,10 @@ async fn login_unknown_email_returns_401() {
 #[tokio::test]
 async fn me_without_token_returns_401() {
     let server = make_server().await;
-    server.get("/auth/me").await.assert_status(StatusCode::UNAUTHORIZED);
+    server
+        .get("/auth/me")
+        .await
+        .assert_status(StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -170,7 +176,10 @@ async fn me_with_valid_token_returns_user_info() {
 #[tokio::test]
 async fn refresh_without_cookie_returns_401() {
     let server = make_server().await;
-    server.post("/auth/refresh").await.assert_status(StatusCode::UNAUTHORIZED);
+    server
+        .post("/auth/refresh")
+        .await
+        .assert_status(StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
@@ -196,7 +205,10 @@ async fn refresh_rotates_token() {
     assert!(ref_res.json::<Value>()["access_token"].is_string());
 
     let new_refresh_token = get_refresh_token_from_cookie(&ref_res.header("set-cookie"));
-    assert_ne!(refresh_token, new_refresh_token, "refresh token must rotate");
+    assert_ne!(
+        refresh_token, new_refresh_token,
+        "refresh token must rotate"
+    );
 
     // Старый токен больше не работает
     server

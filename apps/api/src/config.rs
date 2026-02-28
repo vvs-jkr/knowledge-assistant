@@ -2,7 +2,7 @@
 pub struct AppConfig {
     pub database_url: String,
     pub jwt_secret: String,
-    pub encryption_key: String, // 32 байта hex
+    pub encryption_key: String,
     pub anthropic_api_key: String,
     pub frontend_url: String,
     pub port: u16,
@@ -28,6 +28,25 @@ fn require_env(key: &str) -> anyhow::Result<String> {
     std::env::var(key).map_err(|_| anyhow::anyhow!("Missing required env var: {key}"))
 }
 
+// Panics at startup if the env var is malformed — better than silently using a wrong key.
+fn decode_encryption_key(hex: &str) -> [u8; 32] {
+    assert!(
+        hex.len() == 64,
+        "ENCRYPTION_KEY must be exactly 64 hex chars (32 bytes), got {}",
+        hex.len()
+    );
+    let bytes: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&hex[i..i + 2], 16)
+                .expect("ENCRYPTION_KEY must contain only valid hex characters")
+        })
+        .collect();
+    bytes
+        .try_into()
+        .expect("32 bytes guaranteed by length check above")
+}
+
 // ---------------------------------------------------------------------------
 // AppState — shared state for all route handlers
 // ---------------------------------------------------------------------------
@@ -38,8 +57,7 @@ pub struct AppState {
     pub jwt_encoding_key: jsonwebtoken::EncodingKey,
     pub jwt_decoding_key: jsonwebtoken::DecodingKey,
     pub frontend_url: String,
-    pub encryption_key: String,
-    /// false в тестах — GovernorLayer требует реального TCP-соединения
+    pub encryption_key: [u8; 32],
     pub rate_limit_enabled: bool,
 }
 
@@ -50,9 +68,10 @@ impl AppState {
             jwt_encoding_key: jsonwebtoken::EncodingKey::from_secret(config.jwt_secret.as_bytes()),
             jwt_decoding_key: jsonwebtoken::DecodingKey::from_secret(config.jwt_secret.as_bytes()),
             frontend_url: config.frontend_url.clone(),
-            encryption_key: config.encryption_key.clone(),
-            rate_limit_enabled: true,
+            encryption_key: decode_encryption_key(&config.encryption_key),
+            rate_limit_enabled: std::env::var("RATE_LIMIT_ENABLED")
+                .map(|v| v == "true")
+                .unwrap_or(true),
         }
     }
 }
-

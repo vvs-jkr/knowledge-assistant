@@ -1,5 +1,5 @@
 use chrono::Utc;
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -36,12 +36,13 @@ pub struct UserInfo {
 
 #[derive(Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,   // user id
+    pub sub: String,
     pub email: String,
-    pub exp: usize,    // expiration (unix timestamp)
-    pub iat: usize,    // issued at
+    pub exp: usize,
+    pub iat: usize,
 }
 
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 pub fn create_access_token(
     user_id: &str,
     email: &str,
@@ -70,18 +71,22 @@ pub fn verify_access_token(
 // ---------------------------------------------------------------------------
 
 use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
-    password_hash::{SaltString, rand_core::OsRng},
 };
 
 pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
     let salt = SaltString::generate(&mut OsRng);
-    Ok(Argon2::default().hash_password(password.as_bytes(), &salt)?.to_string())
+    Ok(Argon2::default()
+        .hash_password(password.as_bytes(), &salt)?
+        .to_string())
 }
 
 pub fn verify_password(password: &str, hash: &str) -> Result<bool, argon2::password_hash::Error> {
     let parsed_hash = PasswordHash::new(hash)?;
-    Ok(Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok())
+    Ok(Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok())
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +138,7 @@ pub fn extract_refresh_token(headers: &axum::http::HeaderMap) -> Option<String> 
         .find_map(|part| {
             part.trim()
                 .strip_prefix("refresh_token=")
-                .map(|v| v.to_string())
+                .map(std::string::ToString::to_string)
         })
 }
 

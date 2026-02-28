@@ -5,7 +5,7 @@ pub mod error;
 pub mod middleware;
 pub mod routes;
 
-use axum::{Router, routing::get};
+use axum::{routing::get, Router};
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
 pub fn build_app(state: config::AppState) -> Router {
@@ -42,7 +42,10 @@ pub async fn build_test_state() -> config::AppState {
     let pool = sqlx::SqlitePool::connect("sqlite::memory:")
         .await
         .expect("in-memory sqlite");
-    sqlx::migrate!("./migrations").run(&pool).await.expect("migrations");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("migrations");
     let mut state = config::AppState::new(
         &config::AppConfig {
             database_url: "sqlite::memory:".into(),

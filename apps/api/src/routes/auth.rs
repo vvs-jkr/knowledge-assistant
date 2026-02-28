@@ -1,25 +1,24 @@
-use axum::{
-    Json, Router,
-    extract::State,
-    http::{HeaderMap, StatusCode, header::SET_COOKIE},
-    response::IntoResponse,
-    routing::{get, post},
-};
 use crate::{
     auth::{
-        AuthResponse, LoginRequest, RegisterRequest, UserInfo,
         build_clear_refresh_cookie, build_refresh_cookie, create_access_token,
         extract_refresh_token, generate_refresh_token, hash_password, refresh_token_expires_at,
-        verify_password,
+        verify_password, AuthResponse, LoginRequest, RegisterRequest, UserInfo,
     },
     config::AppState,
     error::{ApiResult, AppError},
     middleware::AuthUser,
 };
+use axum::{
+    extract::State,
+    http::{header::SET_COOKIE, HeaderMap, StatusCode},
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
 
 pub fn router(rate_limit_enabled: bool) -> Router<AppState> {
     use tower::ServiceBuilder;
-    use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
+    use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 
     let governor_layer = if rate_limit_enabled {
         let conf = GovernorConfigBuilder::default()
@@ -27,7 +26,9 @@ pub fn router(rate_limit_enabled: bool) -> Router<AppState> {
             .burst_size(5)
             .finish()
             .expect("valid governor config");
-        Some(GovernorLayer { config: conf.into() })
+        Some(GovernorLayer {
+            config: conf.into(),
+        })
     } else {
         None
     };
@@ -65,12 +66,13 @@ async fn register(
     )
     .execute(&state.db)
     .await
-    .map_err(|e| {
-        if e.to_string().contains("UNIQUE constraint failed") {
+    .map_err(|e| match e {
+        sqlx::Error::Database(ref db_err)
+            if db_err.kind() == sqlx::error::ErrorKind::UniqueViolation =>
+        {
             AppError::BadRequest("Email already registered".into())
-        } else {
-            AppError::Internal(e.into())
         }
+        _ => AppError::Internal(e.into()),
     })?;
 
     let (access_token, cookie) = create_session(&state, &user_id, &body.email).await?;
@@ -80,7 +82,10 @@ async fn register(
         [(SET_COOKIE, cookie)],
         Json(AuthResponse {
             access_token,
-            user: UserInfo { id: user_id, email: body.email },
+            user: UserInfo {
+                id: user_id,
+                email: body.email,
+            },
         }),
     ))
 }
@@ -125,7 +130,10 @@ async fn login(
         [(SET_COOKIE, cookie)],
         Json(AuthResponse {
             access_token,
-            user: UserInfo { id: user_id, email: row.email },
+            user: UserInfo {
+                id: user_id,
+                email: row.email,
+            },
         }),
     ))
 }
@@ -157,9 +165,8 @@ async fn refresh(
     let user_id = row.user_id.ok_or(AppError::Unauthorized)?;
 
     // Проверяем срок действия
-    let expires_at =
-        chrono::NaiveDateTime::parse_from_str(&row.expires_at, "%Y-%m-%d %H:%M:%S")
-            .map_err(|_| AppError::Unauthorized)?;
+    let expires_at = chrono::NaiveDateTime::parse_from_str(&row.expires_at, "%Y-%m-%d %H:%M:%S")
+        .map_err(|_| AppError::Unauthorized)?;
     if expires_at < chrono::Utc::now().naive_utc() {
         sqlx::query!("DELETE FROM sessions WHERE id = ?", session_id)
             .execute(&state.db)
@@ -181,7 +188,10 @@ async fn refresh(
         [(SET_COOKIE, cookie)],
         Json(AuthResponse {
             access_token,
-            user: UserInfo { id: user_id, email: row.email },
+            user: UserInfo {
+                id: user_id,
+                email: row.email,
+            },
         }),
     ))
 }
@@ -190,15 +200,15 @@ async fn refresh(
 // POST /auth/logout
 // ---------------------------------------------------------------------------
 
-async fn logout(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> ApiResult<impl IntoResponse> {
+async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<impl IntoResponse> {
     if let Some(refresh_token) = extract_refresh_token(&headers) {
-        sqlx::query!("DELETE FROM sessions WHERE refresh_token = ?", refresh_token)
-            .execute(&state.db)
-            .await
-            .map_err(AppError::from)?;
+        sqlx::query!(
+            "DELETE FROM sessions WHERE refresh_token = ?",
+            refresh_token
+        )
+        .execute(&state.db)
+        .await
+        .map_err(AppError::from)?;
     }
 
     Ok((StatusCode::OK, [(SET_COOKIE, build_clear_refresh_cookie())]))
@@ -209,14 +219,17 @@ async fn logout(
 // ---------------------------------------------------------------------------
 
 async fn me(AuthUser(claims): AuthUser) -> Json<UserInfo> {
-    Json(UserInfo { id: claims.sub, email: claims.email })
+    Json(UserInfo {
+        id: claims.sub,
+        email: claims.email,
+    })
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Создаёт сессию в БД и возвращает (access_token, Set-Cookie value).
+// Создаёт сессию в БД и возвращает (access_token, Set-Cookie value).
 async fn create_session(
     state: &AppState,
     user_id: &str,
@@ -254,7 +267,9 @@ fn validate_email(email: &str) -> ApiResult<()> {
 
 fn validate_password(password: &str) -> ApiResult<()> {
     if password.len() < 8 {
-        return Err(AppError::BadRequest("Password must be at least 8 characters".into()));
+        return Err(AppError::BadRequest(
+            "Password must be at least 8 characters".into(),
+        ));
     }
     Ok(())
 }
