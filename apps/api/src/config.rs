@@ -4,6 +4,7 @@ pub struct AppConfig {
     pub jwt_secret: String,
     pub encryption_key: String,
     pub anthropic_api_key: String,
+    pub voyage_api_key: String,
     pub frontend_url: String,
     pub port: u16,
 }
@@ -15,6 +16,7 @@ impl AppConfig {
             jwt_secret: require_env("JWT_SECRET")?,
             encryption_key: require_env("ENCRYPTION_KEY")?,
             anthropic_api_key: require_env("ANTHROPIC_API_KEY")?,
+            voyage_api_key: require_env("VOYAGE_API_KEY")?,
             frontend_url: std::env::var("FRONTEND_URL")
                 .unwrap_or_else(|_| "http://localhost:5173".into()),
             port: std::env::var("PORT")
@@ -59,6 +61,9 @@ pub struct AppState {
     pub frontend_url: String,
     pub encryption_key: [u8; 32],
     pub rate_limit_enabled: bool,
+    pub anthropic_api_key: String,
+    pub voyage_api_key: String,
+    pub http_client: reqwest::Client,
 }
 
 impl AppState {
@@ -72,6 +77,9 @@ impl AppState {
             rate_limit_enabled: std::env::var("RATE_LIMIT_ENABLED")
                 .map(|v| v == "true")
                 .unwrap_or(true),
+            anthropic_api_key: config.anthropic_api_key.clone(),
+            voyage_api_key: config.voyage_api_key.clone(),
+            http_client: reqwest::Client::new(),
         }
     }
 }
