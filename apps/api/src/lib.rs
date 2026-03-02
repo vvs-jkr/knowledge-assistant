@@ -1,7 +1,9 @@
+pub mod ai;
 pub mod auth;
 pub mod config;
 pub mod crypto;
 pub mod db;
+pub mod embeddings;
 pub mod error;
 pub mod middleware;
 pub mod notes;
@@ -41,6 +43,7 @@ pub fn build_app(state: config::AppState) -> Router {
 }
 
 pub async fn build_test_state() -> config::AppState {
+    db::register_extensions();
     let pool = sqlx::SqlitePool::connect("sqlite::memory:")
         .await
         .expect("in-memory sqlite");
@@ -54,6 +57,7 @@ pub async fn build_test_state() -> config::AppState {
             jwt_secret: "test_secret_32_bytes_long_enough!".into(),
             encryption_key: "0".repeat(64),
             anthropic_api_key: String::new(),
+            voyage_api_key: String::new(),
             frontend_url: "http://localhost:5173".into(),
             port: 8080,
         },

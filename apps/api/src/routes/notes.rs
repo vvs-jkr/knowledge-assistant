@@ -7,8 +7,9 @@ use axum::{
 };
 
 use crate::{
+    ai,
     config::AppState,
-    crypto,
+    crypto, embeddings,
     error::{ApiResult, AppError},
     middleware::AuthUser,
     notes::{extract_frontmatter, NoteMetadata, NoteWithContent, UpdateNoteRequest},
@@ -21,11 +22,13 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/notes", get(list_notes))
         .route("/notes/upload", post(upload_note))
+        .route("/notes/search", post(search_notes))
         .route(
             "/notes/:id",
             get(get_note).put(update_note).delete(delete_note),
         )
         .route("/notes/:id/download", get(download_note))
+        .route("/notes/:id/analyze", post(analyze_note_handler))
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +108,9 @@ async fn upload_note(
         .await
         .map_err(AppError::from)?;
 
+        // Generate and store embedding — failure is non-fatal.
+        spawn_embedding(&state, note_id.clone(), content_str.to_owned());
+
         uploaded.push(NoteMetadata {
             id: note_id,
             filename,
@@ -167,7 +173,7 @@ async fn list_notes(
 }
 
 // ---------------------------------------------------------------------------
-// GET /notes/{id}
+// GET /notes/:id
 // ---------------------------------------------------------------------------
 
 async fn get_note(
@@ -207,7 +213,7 @@ async fn get_note(
 }
 
 // ---------------------------------------------------------------------------
-// PUT /notes/{id}
+// PUT /notes/:id
 // ---------------------------------------------------------------------------
 
 async fn update_note(
@@ -257,6 +263,9 @@ async fn update_note(
     .await
     .map_err(AppError::from)?;
 
+    // Re-generate embedding — failure is non-fatal.
+    spawn_embedding(&state, id.clone(), body.content.clone());
+
     Ok(Json(NoteMetadata {
         id,
         filename: new_filename,
@@ -269,7 +278,7 @@ async fn update_note(
 }
 
 // ---------------------------------------------------------------------------
-// DELETE /notes/{id}
+// DELETE /notes/:id
 // ---------------------------------------------------------------------------
 
 async fn delete_note(
@@ -290,11 +299,16 @@ async fn delete_note(
         return Err(AppError::NotFound);
     }
 
+    // Clean up embedding — failure is non-fatal.
+    if let Err(e) = embeddings::delete_embedding(&state.db, &id).await {
+        tracing::warn!("Failed to delete embedding for note {id}: {e}");
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 
 // ---------------------------------------------------------------------------
-// GET /notes/{id}/download
+// GET /notes/:id/download
 // ---------------------------------------------------------------------------
 
 async fn download_note(
@@ -330,6 +344,189 @@ async fn download_note(
 }
 
 // ---------------------------------------------------------------------------
+// POST /notes/search
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Deserialize)]
+struct SearchRequest {
+    query: String,
+    #[serde(default = "default_limit")]
+    limit: u32,
+}
+
+fn default_limit() -> u32 {
+    10
+}
+
+#[derive(serde::Serialize)]
+struct SearchResult {
+    note_id: String,
+    filename: String,
+    distance: f64,
+    snippet: String,
+    frontmatter: Option<serde_json::Value>,
+}
+
+async fn search_notes(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<SearchRequest>,
+) -> ApiResult<Json<Vec<SearchResult>>> {
+    if body.query.trim().is_empty() {
+        return Err(AppError::BadRequest("Search query cannot be empty".into()));
+    }
+
+    if state.voyage_api_key.is_empty() {
+        return Err(AppError::BadRequest(
+            "Search is not configured (missing VOYAGE_API_KEY)".into(),
+        ));
+    }
+
+    // Embed the query.
+    let query_embedding = embeddings::generate_embedding(
+        &state.http_client,
+        &state.voyage_api_key,
+        &body.query,
+        "query",
+    )
+    .await?;
+
+    let embedding_bytes = embeddings::embedding_to_bytes(&query_embedding);
+    // Request more than `limit` to account for ownership filtering.
+    let fetch_limit = i64::from((body.limit * 3).min(150));
+
+    // Vector KNN search via sqlite-vec.
+    let rows: Vec<(String, f64)> = sqlx::query_as(
+        "SELECT note_id, distance FROM note_embeddings WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
+    )
+    .bind(&embedding_bytes)
+    .bind(fetch_limit)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("vector search: {e}")))?;
+
+    let limit = body.limit.min(50) as usize;
+    let mut results: Vec<SearchResult> = Vec::new();
+
+    for (note_id, distance) in rows {
+        if results.len() >= limit {
+            break;
+        }
+
+        // Ownership check + metadata fetch.
+        let note = sqlx::query!(
+            "SELECT filename, encrypted_content, nonce, frontmatter FROM note_files WHERE id = ? AND user_id = ?",
+            note_id,
+            claims.sub,
+        )
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+        let Some(note) = note else { continue };
+
+        let snippet =
+            match crypto::decrypt(&state.encryption_key, &note.encrypted_content, &note.nonce) {
+                Ok(bytes) => {
+                    let text = String::from_utf8_lossy(&bytes);
+                    make_snippet(&text, &body.query, 200)
+                }
+                Err(_) => String::new(),
+            };
+
+        let frontmatter = note
+            .frontmatter
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok());
+
+        results.push(SearchResult {
+            note_id,
+            filename: note.filename,
+            distance,
+            snippet,
+            frontmatter,
+        });
+    }
+
+    Ok(Json(results))
+}
+
+// ---------------------------------------------------------------------------
+// POST /notes/:id/analyze
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+struct AnalyzeResponse {
+    analysis: ai::NoteAnalysis,
+}
+
+async fn analyze_note_handler(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<AnalyzeResponse>> {
+    if state.anthropic_api_key.is_empty() {
+        return Err(AppError::BadRequest(
+            "AI analysis is not configured (missing ANTHROPIC_API_KEY)".into(),
+        ));
+    }
+
+    // Fetch and decrypt target note.
+    let row = sqlx::query!(
+        "SELECT filename, encrypted_content, nonce FROM note_files WHERE id = ? AND user_id = ?",
+        id,
+        claims.sub,
+    )
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?
+    .ok_or(AppError::NotFound)?;
+
+    let plaintext = crypto::decrypt(&state.encryption_key, &row.encrypted_content, &row.nonce)?;
+    let content = String::from_utf8(plaintext)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("utf8: {e}")))?;
+
+    // Build context from other notes (first 200 chars each, up to 30 notes).
+    let other_rows = sqlx::query!(
+        "SELECT id, filename, encrypted_content, nonce FROM note_files WHERE user_id = ? AND id != ? LIMIT 30",
+        claims.sub,
+        id,
+    )
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let mut context_lines: Vec<String> = Vec::new();
+    for note in &other_rows {
+        let note_id = note.id.as_deref().unwrap_or("?");
+        if let Ok(bytes) =
+            crypto::decrypt(&state.encryption_key, &note.encrypted_content, &note.nonce)
+        {
+            let text = String::from_utf8_lossy(&bytes);
+            let preview: String = text.chars().take(200).collect();
+            context_lines.push(format!(
+                "- [{}] (id: {}): {}…",
+                note.filename, note_id, preview
+            ));
+        } else {
+            context_lines.push(format!("- [{}] (id: {})", note.filename, note_id));
+        }
+    }
+    let other_notes_context = context_lines.join("\n");
+
+    let analysis = ai::analyze_note(
+        &state.http_client,
+        &state.anthropic_api_key,
+        &content,
+        &row.filename,
+        &other_notes_context,
+    )
+    .await?;
+
+    Ok(Json(AnalyzeResponse { analysis }))
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -341,4 +538,53 @@ fn frontmatter_to_sql(frontmatter: Option<&serde_json::Value>) -> ApiResult<Opti
                 .map_err(|e| AppError::Internal(anyhow::anyhow!("frontmatter serialise: {e}")))
         })
         .transpose()
+}
+
+/// Returns a text snippet centred around the first occurrence of `query` in `content`.
+fn make_snippet(content: &str, query: &str, max_len: usize) -> String {
+    let query_lower = query.to_lowercase();
+    let content_lower = content.to_lowercase();
+
+    let pos = content_lower.find(query_lower.as_str()).unwrap_or(0);
+    let start = pos.saturating_sub(max_len / 2);
+    // Clamp to char boundary.
+    let start = content
+        .char_indices()
+        .map(|(i, _)| i)
+        .rfind(|&i| i <= start)
+        .unwrap_or(0);
+
+    let snippet: String = content[start..].chars().take(max_len).collect();
+
+    if start == 0 {
+        format!("{snippet}…")
+    } else {
+        format!("…{snippet}…")
+    }
+}
+
+/// Spawns a background task to generate and store an embedding for `note_id`.
+/// Logs a warning on failure — never panics, never fails the calling request.
+fn spawn_embedding(state: &AppState, note_id: String, content: String) {
+    if state.voyage_api_key.is_empty() {
+        return;
+    }
+    let state = state.clone();
+    tokio::spawn(async move {
+        match embeddings::generate_embedding(
+            &state.http_client,
+            &state.voyage_api_key,
+            &content,
+            "document",
+        )
+        .await
+        {
+            Ok(emb) => {
+                if let Err(e) = embeddings::upsert_embedding(&state.db, &note_id, &emb).await {
+                    tracing::warn!("Failed to store embedding for note {note_id}: {e}");
+                }
+            }
+            Err(e) => tracing::warn!("Failed to generate embedding for note {note_id}: {e}"),
+        }
+    });
 }
