@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useNotesStore } from './notes.store'
 
-const resetStore = () => useNotesStore.setState({ selectedNoteId: null, isEditing: false })
+const resetStore = () =>
+  useNotesStore.setState({
+    selectedNoteId: null,
+    isEditing: false,
+    searchQuery: '',
+    isSearching: false,
+  })
 
 describe('useNotesStore', () => {
   beforeEach(() => {
@@ -43,5 +49,31 @@ describe('useNotesStore', () => {
   it('selectNote does not change isEditing if already false', () => {
     useNotesStore.getState().selectNote('note-2')
     expect(useNotesStore.getState().isEditing).toBe(false)
+  })
+
+  it('starts with empty searchQuery and isSearching false', () => {
+    const { searchQuery, isSearching } = useNotesStore.getState()
+    expect(searchQuery).toBe('')
+    expect(isSearching).toBe(false)
+  })
+
+  it('setSearchQuery updates searchQuery', () => {
+    useNotesStore.getState().setSearchQuery('rust ownership')
+    expect(useNotesStore.getState().searchQuery).toBe('rust ownership')
+  })
+
+  it('setIsSearching updates isSearching', () => {
+    useNotesStore.getState().setIsSearching(true)
+    expect(useNotesStore.getState().isSearching).toBe(true)
+    useNotesStore.getState().setIsSearching(false)
+    expect(useNotesStore.getState().isSearching).toBe(false)
+  })
+
+  it('clearSearch resets searchQuery and isSearching', () => {
+    useNotesStore.getState().setSearchQuery('some query')
+    useNotesStore.getState().setIsSearching(true)
+    useNotesStore.getState().clearSearch()
+    expect(useNotesStore.getState().searchQuery).toBe('')
+    expect(useNotesStore.getState().isSearching).toBe(false)
   })
 })

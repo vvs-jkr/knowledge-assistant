@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { downloadNote, useDeleteNote, useNote } from '@/features/notes/api/notes.api'
+import { NoteAnalysisDialog } from '@/features/notes/components/NoteAnalysisDialog'
 import { useNotesStore } from '@/features/notes/store/notes.store'
 import { Download, Edit, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -59,6 +60,7 @@ export function NoteViewer() {
       <div className="flex shrink-0 items-center justify-between border-b px-6 py-3">
         <h2 className="truncate text-lg font-semibold">{note.filename}</h2>
         <div className="flex shrink-0 items-center gap-1">
+          <NoteAnalysisDialog noteId={note.id} />
           <Button
             variant="ghost"
             size="icon"

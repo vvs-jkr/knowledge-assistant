@@ -1,5 +1,11 @@
 import { api } from '@/shared/lib/api'
-import type { NoteMetadata, NoteWithContent, UpdateNoteInput } from '@/shared/schemas/notes.schema'
+import type {
+  AnalyzeResponse,
+  NoteMetadata,
+  NoteWithContent,
+  SearchResult,
+  UpdateNoteInput,
+} from '@/shared/schemas/notes.schema'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 const notesApi = {
@@ -20,6 +26,12 @@ const notesApi = {
 
   download: (id: string) =>
     api.get(`/notes/${id}/download`, { responseType: 'blob' }).then((r) => r.data as Blob),
+
+  search: (query: string, limit?: number) =>
+    api.post<SearchResult[]>('/notes/search', { query, limit }).then((r) => r.data),
+
+  analyze: (noteId: string) =>
+    api.post<AnalyzeResponse>(`/notes/${noteId}/analyze`).then((r) => r.data),
 }
 
 export function useNotes() {
@@ -62,6 +74,19 @@ export function useDeleteNote() {
   return useMutation({
     mutationFn: notesApi.delete,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notes'] }),
+  })
+}
+
+export function useSearchNotes() {
+  return useMutation({
+    mutationFn: ({ query, limit }: { query: string; limit?: number }) =>
+      notesApi.search(query, limit),
+  })
+}
+
+export function useAnalyzeNote() {
+  return useMutation({
+    mutationFn: (noteId: string) => notesApi.analyze(noteId),
   })
 }
 
