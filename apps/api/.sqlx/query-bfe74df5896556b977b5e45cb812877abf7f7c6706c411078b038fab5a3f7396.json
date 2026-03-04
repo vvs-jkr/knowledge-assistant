@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT filename, encrypted_content, nonce, frontmatter FROM note_files WHERE id = ? AND user_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "filename",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "encrypted_content",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "nonce",
+        "ordinal": 2,
+        "type_info": "Blob"
+      },
+      {
+        "name": "frontmatter",
+        "ordinal": 3,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "bfe74df5896556b977b5e45cb812877abf7f7c6706c411078b038fab5a3f7396"
+}
