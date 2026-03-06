@@ -1,4 +1,7 @@
-use crate::error::{ApiResult, AppError};
+use crate::{
+    error::{ApiResult, AppError},
+    health::LabExtraction,
+};
 use serde::{Deserialize, Serialize};
 
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
@@ -27,7 +30,7 @@ pub struct DuplicateCandidate {
 }
 
 // ---------------------------------------------------------------------------
-// Anthropic API request/response shapes
+// Anthropic API request/response shapes — text messages
 // ---------------------------------------------------------------------------
 
 #[derive(Serialize)]
@@ -43,6 +46,28 @@ struct AnthropicMessage<'a> {
     role: &'a str,
     content: &'a str,
 }
+
+// ---------------------------------------------------------------------------
+// Anthropic API request/response shapes — PDF document messages
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize)]
+struct PdfAnthropicRequest<'a> {
+    model: &'a str,
+    max_tokens: u32,
+    system: &'a str,
+    messages: Vec<PdfMessage>,
+}
+
+#[derive(Serialize)]
+struct PdfMessage {
+    role: String,
+    content: Vec<serde_json::Value>,
+}
+
+// ---------------------------------------------------------------------------
+// Shared response shape
+// ---------------------------------------------------------------------------
 
 #[derive(Deserialize)]
 struct AnthropicResponse {
@@ -155,12 +180,136 @@ fn build_user_message(content: &str, filename: &str, other_notes_context: &str) 
 }
 
 // ---------------------------------------------------------------------------
+// Health lab extraction (PDF → structured metrics)
+// ---------------------------------------------------------------------------
+
+/// Sends a base64-encoded PDF to Claude and returns extracted lab metrics.
+///
+/// The `pdf_base64` argument must be standard base64 (no line breaks).
+pub async fn extract_lab_metrics(
+    http_client: &reqwest::Client,
+    anthropic_api_key: &str,
+    pdf_base64: &str,
+    pdf_filename: &str,
+) -> ApiResult<LabExtraction> {
+    let system = lab_system_prompt();
+    let content = vec![
+        serde_json::json!({
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": pdf_base64
+            }
+        }),
+        serde_json::json!({
+            "type": "text",
+            "text": format!(
+                "Filename: {pdf_filename}\n\nExtract all lab metrics from this document."
+            )
+        }),
+    ];
+
+    let request = PdfAnthropicRequest {
+        model: ANTHROPIC_MODEL,
+        max_tokens: 4096,
+        system: &system,
+        messages: vec![PdfMessage {
+            role: "user".into(),
+            content,
+        }],
+    };
+
+    let response = http_client
+        .post(ANTHROPIC_API_URL)
+        .header("x-api-key", anthropic_api_key)
+        .header("anthropic-version", ANTHROPIC_VERSION)
+        .header("anthropic-beta", "pdfs-2024-09-25")
+        .header("content-type", "application/json")
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic PDF request failed: {e}")))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "Anthropic API error {status}: {body}"
+        )));
+    }
+
+    let api_resp: AnthropicResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic PDF parse error: {e}")))?;
+
+    let text = api_resp
+        .content
+        .iter()
+        .find(|b| b.block_type == "text")
+        .and_then(|b| b.text.as_deref())
+        .ok_or_else(|| {
+            AppError::Internal(anyhow::anyhow!("No text block in Anthropic PDF response"))
+        })?;
+
+    serde_json::from_str::<LabExtraction>(text).map_err(|e| {
+        AppError::Internal(anyhow::anyhow!("Failed to parse lab extraction JSON: {e}"))
+    })
+}
+
+fn lab_system_prompt() -> String {
+    r#"You are a medical lab report analyzer. Extract lab metrics from the provided PDF document.
+
+Return ONLY valid JSON — no markdown fences, no extra text — with exactly this structure:
+{
+  "lab_date": "YYYY-MM-DD",
+  "lab_name": "Laboratory Name",
+  "metrics": [
+    {
+      "metric_name": "canonical_name",
+      "value": 5.1,
+      "unit": "mmol/L",
+      "reference_min": 3.9,
+      "reference_max": 6.1,
+      "status": "normal"
+    }
+  ]
+}
+
+Canonical metric names (ONLY use these — omit any metric not in this list):
+- glucose (blood glucose, mmol/L)
+- cholesterol_total (total cholesterol, mmol/L)
+- cholesterol_hdl (HDL cholesterol, mmol/L)
+- cholesterol_ldl (LDL cholesterol, mmol/L)
+- hemoglobin (hemoglobin, g/L)
+- platelets (platelets/thrombocytes, ×10⁹/L)
+- leukocytes (white blood cells, ×10⁹/L)
+- erythrocytes (red blood cells, ×10¹²/L)
+- esr (erythrocyte sedimentation rate, mm/h)
+- creatinine (creatinine, μmol/L)
+- alt (alanine aminotransferase, U/L)
+- ast (aspartate aminotransferase, U/L)
+
+Rules:
+- lab_date: collection/result date from the PDF in YYYY-MM-DD format; use today if not found
+- lab_name: laboratory name from the document header; use empty string if not found
+- Only include metrics that are actually present in the PDF
+- Normalize all values to the units listed above
+- status: "low" if value < reference_min, "high" if value > reference_max, "normal" otherwise
+- reference_min / reference_max: null if the PDF does not provide a reference range
+- value: numeric, floating point"#
+        .into()
+}
+
+// ---------------------------------------------------------------------------
 // Unit tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::health::ExtractedMetric;
 
     #[test]
     fn system_prompt_is_non_empty() {
@@ -193,5 +342,48 @@ mod tests {
         let parsed: NoteAnalysis = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(parsed.quality_score, 8);
         assert_eq!(parsed.tags_suggested, vec!["rust"]);
+    }
+
+    #[test]
+    fn lab_system_prompt_is_non_empty() {
+        assert!(!lab_system_prompt().is_empty());
+    }
+
+    #[test]
+    fn lab_system_prompt_contains_all_metric_names() {
+        let prompt = lab_system_prompt();
+        for name in &[
+            "glucose",
+            "cholesterol_total",
+            "hemoglobin",
+            "platelets",
+            "leukocytes",
+            "creatinine",
+            "alt",
+            "ast",
+        ] {
+            assert!(prompt.contains(name), "prompt missing metric: {name}");
+        }
+    }
+
+    #[test]
+    fn lab_extraction_round_trips_json() {
+        let extraction = LabExtraction {
+            lab_date: "2026-01-15".into(),
+            lab_name: "City Lab".into(),
+            metrics: vec![ExtractedMetric {
+                metric_name: "glucose".into(),
+                value: 5.1,
+                unit: "mmol/L".into(),
+                reference_min: Some(3.9),
+                reference_max: Some(6.1),
+                status: "normal".into(),
+            }],
+        };
+        let json = serde_json::to_string(&extraction).expect("serialize");
+        let parsed: LabExtraction = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.lab_date, "2026-01-15");
+        assert_eq!(parsed.metrics.len(), 1);
+        assert_eq!(parsed.metrics[0].metric_name, "glucose");
     }
 }
