@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT r.id as \"id!\", r.filename as \"filename!\", r.lab_date as \"lab_date!\",\n                  r.lab_name as \"lab_name!\", r.pdf_size_bytes as \"pdf_size_bytes!: i64\",\n                  r.created_at as \"created_at!\",\n                  COUNT(m.id) as \"metrics_count!: i64\"\n           FROM health_records r\n           LEFT JOIN health_metrics m ON m.record_id = r.id\n           WHERE r.user_id = ?\n           GROUP BY r.id\n           ORDER BY r.lab_date DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "filename!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "lab_date!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "lab_name!",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "pdf_size_bytes!: i64",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at!",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "metrics_count!: i64",
+        "ordinal": 6,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "3d77df8fa55b2f4a39bca75fac891b36007dfb06288fd6edde329a3bf92b7773"
+}

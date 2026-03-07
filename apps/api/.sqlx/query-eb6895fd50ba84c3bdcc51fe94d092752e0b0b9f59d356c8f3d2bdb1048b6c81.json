@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO health_records\n           (id, user_id, filename, lab_date, lab_name, encrypted_pdf, nonce, pdf_size_bytes, created_at, updated_at)\n           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": []
+  },
+  "hash": "eb6895fd50ba84c3bdcc51fe94d092752e0b0b9f59d356c8f3d2bdb1048b6c81"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO health_metrics\n               (id, record_id, user_id, metric_name, recorded_date, status, encrypted_value, nonce, created_at)\n               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "34348ed9fd114529697e85dd9db613aca1a86689738a26eeb5b0fd3a0cc26d84"
+}
