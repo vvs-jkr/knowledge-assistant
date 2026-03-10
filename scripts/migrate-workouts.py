@@ -16,6 +16,16 @@ import uuid
 
 CONFIDENCE_MAP = {'high': 1.0, 'medium': 0.7, 'low': 0.3}
 
+WORKOUT_TYPE_MAP = {
+    'amrap': 'amrap', 'AMRAP': 'amrap',
+    'emom': 'emom', 'EMOM': 'emom',
+    'for_time': 'for_time', 'For time': 'for_time', 'for time': 'for_time',
+    'tabata': 'tabata', 'Tabata': 'tabata',
+    'lifting': 'lifting', 'Lifting': 'lifting',
+    'rounds': 'rounds', 'Rounds': 'rounds',
+    'other': 'other', 'Other': 'other',
+}
+
 
 def new_id() -> str:
     return uuid.uuid4().hex
@@ -74,7 +84,7 @@ def migrate(src_path: str, dst_path: str) -> None:
                     user_id,
                     date,
                     name,
-                    w['workout_type'] or 'other',
+                    WORKOUT_TYPE_MAP.get(w['workout_type'] or 'other', 'other'),
                     w['duration_mins'],
                     w['rounds'],
                     'digitized',
