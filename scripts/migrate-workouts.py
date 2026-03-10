@@ -45,6 +45,10 @@ def migrate(src_path: str, dst_path: str) -> None:
     with dst:
         for w in src_workouts:
             date = w['full_date']
+            if not date:
+                skipped += 1
+                continue
+
             name = w['workout_name'] or 'Workout'
 
             # Skip duplicates by (user_id, date, name)
