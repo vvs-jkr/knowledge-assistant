@@ -27,7 +27,7 @@ export function VolumeBarChart({ data }: VolumeBarChartProps) {
   }))
 
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height={280}>
       <BarChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
         <XAxis dataKey="week" tick={{ fontSize: 11 }} />

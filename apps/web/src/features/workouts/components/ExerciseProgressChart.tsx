@@ -33,7 +33,7 @@ export function ExerciseProgressChart({ data, exerciseName }: ExerciseProgressCh
   return (
     <div>
       <p className="mb-2 text-sm font-medium">{exerciseName} — Max Weight (kg)</p>
-      <ResponsiveContainer width="100%" height={200}>
+      <ResponsiveContainer width="100%" height={280}>
         <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} />

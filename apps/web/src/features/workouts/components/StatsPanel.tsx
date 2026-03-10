@@ -46,7 +46,7 @@ export function StatsPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-6 overflow-auto p-4">
+    <div className="flex h-full flex-col gap-6 overflow-auto p-4">
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
         <Card>

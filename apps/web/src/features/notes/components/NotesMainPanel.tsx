@@ -8,7 +8,7 @@ export function NotesMainPanel() {
 
   if (!selectedNoteId) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
         Select a note to view
       </div>
     )

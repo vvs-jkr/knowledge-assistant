@@ -10,7 +10,7 @@ export function WorkoutsMainPanel() {
   const selectedWorkoutId = useWorkoutsStore((s) => s.selectedWorkoutId)
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full w-full flex-col">
       {/* Tab bar */}
       <div className="flex shrink-0 border-b">
         <button

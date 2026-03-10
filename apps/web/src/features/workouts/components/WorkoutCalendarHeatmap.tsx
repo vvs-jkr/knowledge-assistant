@@ -90,7 +90,7 @@ export function WorkoutCalendarHeatmap({ data }: WorkoutCalendarHeatmapProps) {
             // Use the week's start date as key (guaranteed unique)
             const weekKey = col[0]?.date ?? `week-${i}`
             return (
-              <div key={weekKey} className="h-4 w-3 text-center">
+              <div key={weekKey} className="h-4 w-4 text-center">
                 {label && (
                   <span className="text-[10px] text-muted-foreground leading-none">
                     {label.label}
@@ -106,7 +106,7 @@ export function WorkoutCalendarHeatmap({ data }: WorkoutCalendarHeatmapProps) {
           {/* Day labels */}
           <div className="flex flex-col gap-0.5 pr-1">
             {DAY_LABELS.map((label, i) => (
-              <div key={label} className="flex h-3 items-center">
+              <div key={label} className="flex h-4 items-center">
                 <span className="w-7 text-right text-[10px] text-muted-foreground leading-none">
                   {SHOW_DAY_LABELS.includes(i) ? label : ''}
                 </span>
@@ -122,7 +122,7 @@ export function WorkoutCalendarHeatmap({ data }: WorkoutCalendarHeatmapProps) {
                 {col.map((cell) => (
                   <div
                     key={cell?.date ?? 'empty'}
-                    className={`h-3 w-3 rounded-sm ${cell ? cellColorClass(cell.count) : 'bg-muted'}`}
+                    className={`h-4 w-4 rounded-sm ${cell ? cellColorClass(cell.count) : 'bg-muted'}`}
                     title={
                       cell
                         ? `${cell.date}: ${cell.count} ${cell.count === 1 ? 'workout' : 'workouts'}`
