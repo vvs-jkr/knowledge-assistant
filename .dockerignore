@@ -1,0 +1,12 @@
+node_modules/
+apps/api/target/
+apps/web/dist/
+apps/web/node_modules/
+data/
+.env*
+*.db
+*.db-shm
+*.db-wal
+digitizer/
+.claude/
+.git/
