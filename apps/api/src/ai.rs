@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
-const ANTHROPIC_MODEL: &str = "claude-sonnet-4-20250514";
+const ANTHROPIC_MODEL: &str = "claude-3-5-sonnet-20241022";
 
 // ---------------------------------------------------------------------------
 // Public types
