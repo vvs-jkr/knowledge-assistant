@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAnalyzeNote } from '@/features/notes/api/notes.api'
 import { useNotesStore } from '@/features/notes/store/notes.store'
 import type { NoteAnalysis } from '@/shared/schemas/notes.schema'
+import axios from 'axios'
 import { BrainCircuit } from 'lucide-react'
 import { useState } from 'react'
 
@@ -54,7 +55,12 @@ export function NoteAnalysisDialog({ noteId }: NoteAnalysisDialogProps) {
 
         {analyzeMutation.isError && (
           <div className="flex flex-col items-center gap-3 py-4">
-            <p className="text-sm text-destructive">Analysis failed. Check your API key.</p>
+            <p className="text-sm text-destructive">
+              {axios.isAxiosError(analyzeMutation.error)
+                ? (analyzeMutation.error.response?.data as { error?: string })?.error ??
+                  `HTTP ${analyzeMutation.error.response?.status ?? 'error'}`
+                : 'Analysis failed'}
+            </p>
             <Button variant="outline" size="sm" onClick={() => analyzeMutation.mutate(noteId)}>
               Retry
             </Button>

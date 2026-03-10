@@ -94,7 +94,7 @@ describe('NoteAnalysisDialog', () => {
     const user = userEvent.setup()
     render(<NoteAnalysisDialog noteId="note-1" />)
     await user.click(screen.getByRole('button', { name: /analyze/i }))
-    expect(screen.getByText('Analysis failed. Check your API key.')).toBeDefined()
+    expect(screen.getByText('Analysis failed')).toBeDefined()
     expect(screen.getByRole('button', { name: /retry/i })).toBeDefined()
   })
 
