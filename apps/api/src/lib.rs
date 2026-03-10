@@ -64,6 +64,7 @@ pub async fn build_test_state() -> config::AppState {
             voyage_api_key: String::new(),
             frontend_url: "http://localhost:5173".into(),
             port: 8080,
+            cookie_secure: false,
         },
         pool,
     );

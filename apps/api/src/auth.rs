@@ -105,17 +105,19 @@ use axum::http::HeaderValue;
 
 const REFRESH_TOKEN_TTL_SECS: i64 = 7 * 24 * 60 * 60; // 7 дней
 
-pub fn build_refresh_cookie(token: &str) -> HeaderValue {
+pub fn build_refresh_cookie(token: &str, secure: bool) -> HeaderValue {
+    let secure_flag = if secure { " Secure;" } else { "" };
     HeaderValue::from_str(&format!(
-        "refresh_token={token}; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age={REFRESH_TOKEN_TTL_SECS}"
+        "refresh_token={token}; HttpOnly;{secure_flag} SameSite=Strict; Path=/auth; Max-Age={REFRESH_TOKEN_TTL_SECS}"
     ))
     .expect("valid cookie header")
 }
 
-pub fn build_clear_refresh_cookie() -> HeaderValue {
-    HeaderValue::from_str(
-        "refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=0",
-    )
+pub fn build_clear_refresh_cookie(secure: bool) -> HeaderValue {
+    let secure_flag = if secure { " Secure;" } else { "" };
+    HeaderValue::from_str(&format!(
+        "refresh_token=; HttpOnly;{secure_flag} SameSite=Strict; Path=/auth; Max-Age=0"
+    ))
     .expect("valid cookie header")
 }
 

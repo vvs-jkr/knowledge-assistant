@@ -7,6 +7,7 @@ pub struct AppConfig {
     pub voyage_api_key: String,
     pub frontend_url: String,
     pub port: u16,
+    pub cookie_secure: bool,
 }
 
 impl AppConfig {
@@ -22,6 +23,9 @@ impl AppConfig {
             port: std::env::var("PORT")
                 .unwrap_or_else(|_| "8080".into())
                 .parse()?,
+            cookie_secure: std::env::var("COOKIE_SECURE")
+                .map(|v| v != "false")
+                .unwrap_or(true),
         })
     }
 }
@@ -64,6 +68,7 @@ pub struct AppState {
     pub anthropic_api_key: String,
     pub voyage_api_key: String,
     pub http_client: reqwest::Client,
+    pub cookie_secure: bool,
 }
 
 impl AppState {
@@ -80,6 +85,7 @@ impl AppState {
             anthropic_api_key: config.anthropic_api_key.clone(),
             voyage_api_key: config.voyage_api_key.clone(),
             http_client: reqwest::Client::new(),
+            cookie_secure: config.cookie_secure,
         }
     }
 }

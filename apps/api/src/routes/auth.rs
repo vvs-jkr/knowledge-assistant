@@ -211,7 +211,7 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<
         .map_err(AppError::from)?;
     }
 
-    Ok((StatusCode::OK, [(SET_COOKIE, build_clear_refresh_cookie())]))
+    Ok((StatusCode::OK, [(SET_COOKIE, build_clear_refresh_cookie(state.cookie_secure))]))
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ async fn create_session(
     let access_token = create_access_token(user_id, email, &state.jwt_encoding_key)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("jwt error: {e}")))?;
 
-    let cookie = build_refresh_cookie(&refresh_token);
+    let cookie = build_refresh_cookie(&refresh_token, state.cookie_secure);
 
     Ok((access_token, cookie))
 }
