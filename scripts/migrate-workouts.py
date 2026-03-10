@@ -77,7 +77,7 @@ def migrate(src_path: str, dst_path: str) -> None:
                     w['workout_type'] or 'other',
                     w['duration_mins'],
                     w['rounds'],
-                    w['source_type'] or 'other',
+                    'digitized',
                     w['file'],
                     w['raw_text'],
                     year_confidence,
