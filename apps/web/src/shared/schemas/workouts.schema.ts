@@ -40,7 +40,7 @@ export const workoutExerciseSchema = z.object({
   notes: z.string().nullable(),
 })
 
-export const workoutDetailSchema = workoutSummarySchema.extend({
+export const workoutDetailSchema = workoutSummarySchema.omit({ exercise_count: true }).extend({
   exercises: z.array(workoutExerciseSchema),
   raw_text: z.string().nullable(),
   source_file: z.string().nullable(),
