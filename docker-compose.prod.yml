@@ -5,8 +5,23 @@ services:
     restart: unless-stopped
     ports:
       - "8181:8080"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:./data/knowledge.db}
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      PORT: "8080"
+      RUST_LOG: ${RUST_LOG:-knowledge_api=info,tower_http=info}
     volumes:
       - app_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   web:
     build:
@@ -18,7 +33,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   app_data:
