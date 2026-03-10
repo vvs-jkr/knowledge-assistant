@@ -17,6 +17,9 @@ RUN cargo build --release 2>&1 || true
 RUN rm -rf src
 
 # Build the real binary.
+# SOURCE_COMMIT is injected by Coolify on every deploy — busts the layer cache.
+ARG SOURCE_COMMIT=dev
+RUN echo "Building commit: $SOURCE_COMMIT"
 COPY . .
 ENV SQLX_OFFLINE=true
 RUN cargo build --release
