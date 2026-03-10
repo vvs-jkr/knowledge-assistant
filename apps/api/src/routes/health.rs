@@ -89,20 +89,16 @@ async fn upload_health(
                 pdf_bytes = Some(data.to_vec());
             }
             "lab_date" => {
-                lab_date = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|e| AppError::BadRequest(format!("failed to read lab_date: {e}")))?,
-                );
+                lab_date =
+                    Some(field.text().await.map_err(|e| {
+                        AppError::BadRequest(format!("failed to read lab_date: {e}"))
+                    })?);
             }
             "lab_name" => {
-                lab_name = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|e| AppError::BadRequest(format!("failed to read lab_name: {e}")))?,
-                );
+                lab_name =
+                    Some(field.text().await.map_err(|e| {
+                        AppError::BadRequest(format!("failed to read lab_name: {e}"))
+                    })?);
             }
             _ => {
                 // consume unknown fields to avoid multipart errors
@@ -111,8 +107,7 @@ async fn upload_health(
         }
     }
 
-    let pdf_bytes =
-        pdf_bytes.ok_or_else(|| AppError::BadRequest("No PDF file provided".into()))?;
+    let pdf_bytes = pdf_bytes.ok_or_else(|| AppError::BadRequest("No PDF file provided".into()))?;
     let pdf_filename = pdf_filename.expect("set when pdf_bytes is Some");
     let lab_date =
         lab_date.ok_or_else(|| AppError::BadRequest("lab_date field is required".into()))?;
@@ -122,9 +117,13 @@ async fn upload_health(
     let pdf_base64 = STANDARD.encode(&pdf_bytes);
 
     // Call Claude to extract metrics (synchronous — the result drives the response).
-    let extraction =
-        ai::extract_lab_metrics(&state.http_client, &state.anthropic_api_key, &pdf_base64, &pdf_filename)
-            .await?;
+    let extraction = ai::extract_lab_metrics(
+        &state.http_client,
+        &state.anthropic_api_key,
+        &pdf_base64,
+        &pdf_filename,
+    )
+    .await?;
 
     // Encrypt and persist the PDF.
     let size_bytes = i64::try_from(pdf_bytes.len())
@@ -170,8 +169,7 @@ async fn upload_health(
         };
         let value_json = serde_json::to_vec(&mv)
             .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize metric: {e}")))?;
-        let (encrypted_value, metric_nonce) =
-            crypto::encrypt(&state.encryption_key, &value_json)?;
+        let (encrypted_value, metric_nonce) = crypto::encrypt(&state.encryption_key, &value_json)?;
 
         let metric_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
 
@@ -219,7 +217,10 @@ async fn upload_health(
         created_at: now,
     };
 
-    Ok((StatusCode::CREATED, Json(UploadHealthResponse { record, metrics })))
+    Ok((
+        StatusCode::CREATED,
+        Json(UploadHealthResponse { record, metrics }),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -365,9 +366,7 @@ async fn fetch_metrics(
 
     let mut metrics = Vec::with_capacity(rows.len());
     for row in &rows {
-        let encrypted_value: Vec<u8> = row
-            .try_get("encrypted_value")
-            .map_err(AppError::from)?;
+        let encrypted_value: Vec<u8> = row.try_get("encrypted_value").map_err(AppError::from)?;
         let nonce: Vec<u8> = row.try_get("nonce").map_err(AppError::from)?;
         let value_json = crypto::decrypt(&state.encryption_key, &encrypted_value, &nonce)?;
         let mv: MetricValue = serde_json::from_slice(&value_json)

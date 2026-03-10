@@ -9,6 +9,7 @@ pub mod health;
 pub mod middleware;
 pub mod notes;
 pub mod routes;
+pub mod workouts;
 
 use axum::{routing::get, Router};
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
@@ -19,6 +20,7 @@ pub fn build_app(state: config::AppState) -> Router {
         .merge(routes::auth::router(state.rate_limit_enabled))
         .merge(routes::notes::router())
         .merge(routes::health::router())
+        .merge(routes::workouts::router())
         .layer(
             CorsLayer::new()
                 .allow_origin(

@@ -205,10 +205,7 @@ async fn list_records_returns_empty_for_new_user() {
     let token = register_and_get_token(&server, "health_list_empty@example.com").await;
     let (name, val) = bearer(&token);
 
-    let res = server
-        .get("/health/records")
-        .add_header(name, val)
-        .await;
+    let res = server.get("/health/records").add_header(name, val).await;
 
     res.assert_status_ok();
     let body = res.json::<Value>();
@@ -260,10 +257,7 @@ async fn list_metrics_returns_empty_for_new_user() {
     let token = register_and_get_token(&server, "health_metrics_empty@example.com").await;
     let (name, val) = bearer(&token);
 
-    let res = server
-        .get("/health/metrics")
-        .add_header(name, val)
-        .await;
+    let res = server.get("/health/metrics").add_header(name, val).await;
 
     res.assert_status_ok();
     assert_eq!(res.json::<Value>().as_array().expect("array").len(), 0);
@@ -304,10 +298,7 @@ async fn export_returns_markdown_content_type() {
     let token = register_and_get_token(&server, "health_export_ct@example.com").await;
     let (name, val) = bearer(&token);
 
-    let res = server
-        .get("/health/export")
-        .add_header(name, val)
-        .await;
+    let res = server.get("/health/export").add_header(name, val).await;
 
     res.assert_status_ok();
     let ct = res

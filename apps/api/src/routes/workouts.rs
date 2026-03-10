@@ -1,0 +1,816 @@
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+    routing::get,
+    Json, Router,
+};
+use sqlx::Row as _;
+
+use crate::{
+    config::AppState,
+    error::{ApiResult, AppError},
+    middleware::AuthUser,
+    workouts::{
+        validate_date, validate_workout_type, CreateLogRequest, CreateWorkoutRequest, ExerciseInfo,
+        ExerciseInput, ExerciseProgress, ExercisesQuery, HeatmapEntry, LogsQuery, StatsQuery,
+        TypeDistribution, UpdateWorkoutRequest, VolumeEntry, WorkoutDetail, WorkoutExercise,
+        WorkoutLog, WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
+    },
+};
+
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/workouts", get(list_workouts).post(create_workout))
+        .route("/workouts/stats", get(get_stats))
+        .route("/workouts/exercises", get(list_exercises))
+        .route("/workouts/logs", get(list_logs).post(create_log))
+        .route(
+            "/workouts/:id",
+            get(get_workout).put(update_workout).delete(delete_workout),
+        )
+}
+
+// ---------------------------------------------------------------------------
+// GET /workouts
+// ---------------------------------------------------------------------------
+
+async fn list_workouts(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<WorkoutsQuery>,
+) -> ApiResult<Json<Vec<WorkoutSummary>>> {
+    let limit = params.limit.unwrap_or(50).min(200);
+    let offset = params.offset.unwrap_or(0);
+
+    let rows = sqlx::query(
+        r"SELECT w.id, w.date, w.name, w.workout_type, w.duration_mins, w.rounds,
+                 w.source_type, w.created_at,
+                 COUNT(we.id) AS exercise_count
+          FROM workouts w
+          LEFT JOIN workout_exercises we ON we.workout_id = w.id
+          WHERE w.user_id = ?
+            AND (? IS NULL OR w.workout_type = ?)
+            AND (? IS NULL OR w.date >= ?)
+            AND (? IS NULL OR w.date <= ?)
+            AND (? IS NULL OR EXISTS (
+                SELECT 1 FROM workout_exercises we2
+                WHERE we2.workout_id = w.id AND we2.exercise_id = ?
+            ))
+          GROUP BY w.id
+          ORDER BY w.date DESC, w.created_at DESC
+          LIMIT ? OFFSET ?",
+    )
+    .bind(&claims.sub)
+    .bind(params.workout_type.as_deref())
+    .bind(params.workout_type.as_deref())
+    .bind(params.from.as_deref())
+    .bind(params.from.as_deref())
+    .bind(params.to.as_deref())
+    .bind(params.to.as_deref())
+    .bind(params.exercise_id.as_deref())
+    .bind(params.exercise_id.as_deref())
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let summaries = rows
+        .into_iter()
+        .map(|r| -> ApiResult<WorkoutSummary> {
+            Ok(WorkoutSummary {
+                id: r.try_get("id").map_err(AppError::from)?,
+                date: r.try_get("date").map_err(AppError::from)?,
+                name: r.try_get("name").map_err(AppError::from)?,
+                workout_type: r.try_get("workout_type").map_err(AppError::from)?,
+                duration_mins: r.try_get("duration_mins").map_err(AppError::from)?,
+                rounds: r.try_get("rounds").map_err(AppError::from)?,
+                exercise_count: r.try_get("exercise_count").map_err(AppError::from)?,
+                source_type: r.try_get("source_type").map_err(AppError::from)?,
+                created_at: r.try_get("created_at").map_err(AppError::from)?,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    Ok(Json(summaries))
+}
+
+// ---------------------------------------------------------------------------
+// POST /workouts
+// ---------------------------------------------------------------------------
+
+#[allow(clippy::too_many_lines)]
+async fn create_workout(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<CreateWorkoutRequest>,
+) -> ApiResult<(StatusCode, Json<WorkoutDetail>)> {
+    if body.name.trim().is_empty() {
+        return Err(AppError::BadRequest("name is required".into()));
+    }
+
+    validate_date(&body.date)?;
+
+    let workout_type = body.workout_type.as_deref().unwrap_or("other");
+    validate_workout_type(workout_type)?;
+
+    let source_type = body.source_type.as_deref().unwrap_or("manual");
+    if !VALID_SOURCE_TYPES.contains(&source_type) {
+        return Err(AppError::BadRequest(format!(
+            "Invalid source_type '{source_type}': must be one of {VALID_SOURCE_TYPES:?}"
+        )));
+    }
+
+    let workout_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    sqlx::query(
+        r"INSERT INTO workouts
+          (id, user_id, date, name, workout_type, duration_mins, rounds,
+           source_type, source_file, raw_text, year_confidence, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&workout_id)
+    .bind(&claims.sub)
+    .bind(&body.date)
+    .bind(&body.name)
+    .bind(workout_type)
+    .bind(body.duration_mins)
+    .bind(body.rounds)
+    .bind(source_type)
+    .bind(body.source_file.as_deref())
+    .bind(body.raw_text.as_deref())
+    .bind(body.year_confidence)
+    .bind(&now)
+    .bind(&now)
+    .execute(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    // Insert exercises if provided.
+    if let Some(exercises) = &body.exercises {
+        insert_exercises(&state, &workout_id, exercises).await?;
+    }
+
+    let detail = fetch_workout_detail(&state, &workout_id, &claims.sub).await?;
+    Ok((StatusCode::CREATED, Json(detail)))
+}
+
+// ---------------------------------------------------------------------------
+// GET /workouts/:id
+// ---------------------------------------------------------------------------
+
+async fn get_workout(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<WorkoutDetail>> {
+    let detail = fetch_workout_detail(&state, &id, &claims.sub).await?;
+    Ok(Json(detail))
+}
+
+// ---------------------------------------------------------------------------
+// PUT /workouts/:id
+// ---------------------------------------------------------------------------
+
+#[allow(clippy::too_many_lines)]
+async fn update_workout(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<UpdateWorkoutRequest>,
+) -> ApiResult<Json<WorkoutDetail>> {
+    // Verify ownership first.
+    let exists = sqlx::query("SELECT id FROM workouts WHERE id = ? AND user_id = ?")
+        .bind(&id)
+        .bind(&claims.sub)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+    if exists.is_none() {
+        return Err(AppError::NotFound);
+    }
+
+    if let Some(date) = &body.date {
+        validate_date(date)?;
+    }
+    if let Some(wt) = &body.workout_type {
+        validate_workout_type(wt)?;
+    }
+    if let Some(st) = &body.source_type {
+        if !VALID_SOURCE_TYPES.contains(&st.as_str()) {
+            return Err(AppError::BadRequest(format!(
+                "Invalid source_type '{st}': must be one of {VALID_SOURCE_TYPES:?}"
+            )));
+        }
+    }
+
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    sqlx::query(
+        r"UPDATE workouts SET
+            date            = COALESCE(?, date),
+            name            = COALESCE(?, name),
+            workout_type    = COALESCE(?, workout_type),
+            duration_mins   = CASE WHEN ? THEN ? ELSE duration_mins END,
+            rounds          = CASE WHEN ? THEN ? ELSE rounds END,
+            source_type     = COALESCE(?, source_type),
+            source_file     = CASE WHEN ? THEN ? ELSE source_file END,
+            raw_text        = CASE WHEN ? THEN ? ELSE raw_text END,
+            year_confidence = CASE WHEN ? THEN ? ELSE year_confidence END,
+            updated_at      = ?
+          WHERE id = ? AND user_id = ?",
+    )
+    .bind(body.date.as_deref())
+    .bind(body.name.as_deref())
+    .bind(body.workout_type.as_deref())
+    .bind(body.duration_mins.is_some())
+    .bind(body.duration_mins)
+    .bind(body.rounds.is_some())
+    .bind(body.rounds)
+    .bind(body.source_type.as_deref())
+    .bind(body.source_file.is_some())
+    .bind(body.source_file.as_deref())
+    .bind(body.raw_text.is_some())
+    .bind(body.raw_text.as_deref())
+    .bind(body.year_confidence.is_some())
+    .bind(body.year_confidence)
+    .bind(&now)
+    .bind(&id)
+    .bind(&claims.sub)
+    .execute(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    // Replace exercises if provided.
+    if let Some(exercises) = &body.exercises {
+        sqlx::query("DELETE FROM workout_exercises WHERE workout_id = ?")
+            .bind(&id)
+            .execute(&state.db)
+            .await
+            .map_err(AppError::from)?;
+
+        insert_exercises(&state, &id, exercises).await?;
+    }
+
+    let detail = fetch_workout_detail(&state, &id, &claims.sub).await?;
+    Ok(Json(detail))
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /workouts/:id
+// ---------------------------------------------------------------------------
+
+async fn delete_workout(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    let result = sqlx::query("DELETE FROM workouts WHERE id = ? AND user_id = ?")
+        .bind(&id)
+        .bind(&claims.sub)
+        .execute(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ---------------------------------------------------------------------------
+// GET /workouts/exercises
+// ---------------------------------------------------------------------------
+
+async fn list_exercises(
+    AuthUser(_claims): AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<ExercisesQuery>,
+) -> ApiResult<Json<Vec<ExerciseInfo>>> {
+    let pattern = format!("%{}%", params.search.as_deref().unwrap_or(""));
+
+    let rows = sqlx::query(
+        "SELECT id, name, muscle_groups FROM exercises WHERE name LIKE ? ORDER BY name LIMIT 100",
+    )
+    .bind(&pattern)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let exercises = rows
+        .into_iter()
+        .map(|r| {
+            let mg_json: String = r.try_get("muscle_groups").map_err(AppError::from)?;
+            let muscle_groups: Vec<String> = serde_json::from_str(&mg_json)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("muscle_groups parse: {e}")))?;
+            Ok(ExerciseInfo {
+                id: r.try_get("id").map_err(AppError::from)?,
+                name: r.try_get("name").map_err(AppError::from)?,
+                muscle_groups,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    Ok(Json(exercises))
+}
+
+// ---------------------------------------------------------------------------
+// GET /workouts/stats
+// ---------------------------------------------------------------------------
+
+#[allow(clippy::too_many_lines)]
+async fn get_stats(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<StatsQuery>,
+) -> ApiResult<Json<WorkoutStats>> {
+    let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+    let default_from = chrono::Utc::now()
+        .checked_sub_signed(chrono::Duration::days(365))
+        .map_or_else(
+            || "2000-01-01".to_owned(),
+            |d| d.format("%Y-%m-%d").to_string(),
+        );
+    let from = params.from.as_deref().unwrap_or(default_from.as_str());
+    let to = params.to.as_deref().unwrap_or(today.as_str());
+
+    // 1. Heatmap
+    let heatmap_rows = sqlx::query(
+        r"SELECT date, COUNT(*) AS count
+          FROM workouts
+          WHERE user_id = ? AND date >= ? AND date <= ?
+          GROUP BY date
+          ORDER BY date ASC",
+    )
+    .bind(&claims.sub)
+    .bind(from)
+    .bind(to)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let heatmap = heatmap_rows
+        .into_iter()
+        .map(|r| {
+            Ok(HeatmapEntry {
+                date: r.try_get("date").map_err(AppError::from)?,
+                count: r.try_get("count").map_err(AppError::from)?,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    // 2. Weekly volume: sets * reps * weight_kg summed per ISO week
+    let volume_rows = sqlx::query(
+        r"SELECT strftime('%Y-%W', w.date) AS week_label,
+                 MIN(w.date) AS week_start,
+                 COALESCE(SUM(
+                     COALESCE(we.sets, 1) *
+                     COALESCE(we.reps, 1) *
+                     COALESCE(we.weight_kg, 0.0)
+                 ), 0.0) AS total_volume,
+                 COUNT(DISTINCT w.id) AS workout_count
+          FROM workouts w
+          LEFT JOIN workout_exercises we ON we.workout_id = w.id
+          WHERE w.user_id = ? AND w.date >= ? AND w.date <= ?
+          GROUP BY week_label
+          ORDER BY week_label ASC",
+    )
+    .bind(&claims.sub)
+    .bind(from)
+    .bind(to)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let weekly_volume = volume_rows
+        .into_iter()
+        .map(|r| {
+            Ok(VolumeEntry {
+                week_start: r.try_get("week_start").map_err(AppError::from)?,
+                total_volume: r.try_get("total_volume").map_err(AppError::from)?,
+                workout_count: r.try_get("workout_count").map_err(AppError::from)?,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    // 3. Type distribution
+    let type_rows = sqlx::query(
+        r"SELECT workout_type, COUNT(*) AS count
+          FROM workouts
+          WHERE user_id = ? AND date >= ? AND date <= ?
+          GROUP BY workout_type
+          ORDER BY count DESC",
+    )
+    .bind(&claims.sub)
+    .bind(from)
+    .bind(to)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let type_distribution = type_rows
+        .into_iter()
+        .map(|r| {
+            Ok(TypeDistribution {
+                workout_type: r.try_get("workout_type").map_err(AppError::from)?,
+                count: r.try_get("count").map_err(AppError::from)?,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    // 4. Exercise progress (only when exercise_id is specified)
+    let exercise_progress = if let Some(ex_id) = &params.exercise_id {
+        let prog_rows = sqlx::query(
+            r"SELECT w.date,
+                     MAX(we.weight_kg) AS max_weight_kg,
+                     SUM(we.sets) AS total_sets,
+                     SUM(we.reps) AS total_reps
+              FROM workout_exercises we
+              JOIN workouts w ON w.id = we.workout_id
+              WHERE w.user_id = ? AND we.exercise_id = ?
+                AND w.date >= ? AND w.date <= ?
+              GROUP BY w.date
+              ORDER BY w.date ASC",
+        )
+        .bind(&claims.sub)
+        .bind(ex_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+        prog_rows
+            .into_iter()
+            .map(|r| {
+                Ok(ExerciseProgress {
+                    date: r.try_get("date").map_err(AppError::from)?,
+                    max_weight_kg: r.try_get("max_weight_kg").map_err(AppError::from)?,
+                    total_sets: r.try_get("total_sets").map_err(AppError::from)?,
+                    total_reps: r.try_get("total_reps").map_err(AppError::from)?,
+                })
+            })
+            .collect::<ApiResult<Vec<_>>>()?
+    } else {
+        Vec::new()
+    };
+
+    // 5. Total workouts
+    let total_workouts: i64 = sqlx::query("SELECT COUNT(*) AS cnt FROM workouts WHERE user_id = ?")
+        .bind(&claims.sub)
+        .fetch_one(&state.db)
+        .await
+        .map_err(AppError::from)?
+        .try_get("cnt")
+        .map_err(AppError::from)?;
+
+    // 6. Total logs
+    let total_logs: i64 = sqlx::query("SELECT COUNT(*) AS cnt FROM workout_logs WHERE user_id = ?")
+        .bind(&claims.sub)
+        .fetch_one(&state.db)
+        .await
+        .map_err(AppError::from)?
+        .try_get("cnt")
+        .map_err(AppError::from)?;
+
+    // 7. Current streak: consecutive days ending today with at least one workout
+    let streak_rows = sqlx::query(
+        r"SELECT DISTINCT date FROM workouts WHERE user_id = ? ORDER BY date DESC LIMIT 400",
+    )
+    .bind(&claims.sub)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let dates: Vec<String> = streak_rows
+        .into_iter()
+        .map(|r| r.try_get::<String, _>("date").map_err(AppError::from))
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    let current_streak_days = compute_streak(&dates, &today);
+
+    Ok(Json(WorkoutStats {
+        heatmap,
+        weekly_volume,
+        type_distribution,
+        exercise_progress,
+        total_workouts,
+        total_logs,
+        current_streak_days,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// POST /workouts/logs
+// ---------------------------------------------------------------------------
+
+async fn create_log(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<CreateLogRequest>,
+) -> ApiResult<(StatusCode, Json<WorkoutLog>)> {
+    // Verify workout exists and belongs to this user.
+    let workout_row = sqlx::query("SELECT id, name FROM workouts WHERE id = ? AND user_id = ?")
+        .bind(&body.workout_id)
+        .bind(&claims.sub)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+    let workout_row = workout_row.ok_or(AppError::NotFound)?;
+    let workout_name: String = workout_row.try_get("name").map_err(AppError::from)?;
+
+    let log_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    sqlx::query(
+        r"INSERT INTO workout_logs
+          (id, user_id, workout_id, completed_at, duration_secs, rounds_completed, notes, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&log_id)
+    .bind(&claims.sub)
+    .bind(&body.workout_id)
+    .bind(&body.completed_at)
+    .bind(body.duration_secs)
+    .bind(body.rounds_completed)
+    .bind(body.notes.as_deref())
+    .bind(&now)
+    .execute(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(WorkoutLog {
+            id: log_id,
+            workout_id: body.workout_id,
+            workout_name,
+            completed_at: body.completed_at,
+            duration_secs: body.duration_secs,
+            rounds_completed: body.rounds_completed,
+            notes: body.notes,
+            created_at: now,
+        }),
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// GET /workouts/logs
+// ---------------------------------------------------------------------------
+
+async fn list_logs(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Query(params): Query<LogsQuery>,
+) -> ApiResult<Json<Vec<WorkoutLog>>> {
+    let limit = params.limit.unwrap_or(50).min(200);
+
+    let rows = sqlx::query(
+        r"SELECT l.id, l.workout_id, w.name AS workout_name,
+                 l.completed_at, l.duration_secs, l.rounds_completed, l.notes, l.created_at
+          FROM workout_logs l
+          JOIN workouts w ON w.id = l.workout_id
+          WHERE l.user_id = ?
+            AND (? IS NULL OR l.completed_at >= ?)
+            AND (? IS NULL OR l.completed_at <= ?)
+            AND (? IS NULL OR l.workout_id = ?)
+          ORDER BY l.completed_at DESC
+          LIMIT ?",
+    )
+    .bind(&claims.sub)
+    .bind(params.from.as_deref())
+    .bind(params.from.as_deref())
+    .bind(params.to.as_deref())
+    .bind(params.to.as_deref())
+    .bind(params.workout_id.as_deref())
+    .bind(params.workout_id.as_deref())
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let logs = rows
+        .into_iter()
+        .map(|r| {
+            Ok(WorkoutLog {
+                id: r.try_get("id").map_err(AppError::from)?,
+                workout_id: r.try_get("workout_id").map_err(AppError::from)?,
+                workout_name: r.try_get("workout_name").map_err(AppError::from)?,
+                completed_at: r.try_get("completed_at").map_err(AppError::from)?,
+                duration_secs: r.try_get("duration_secs").map_err(AppError::from)?,
+                rounds_completed: r.try_get("rounds_completed").map_err(AppError::from)?,
+                notes: r.try_get("notes").map_err(AppError::from)?,
+                created_at: r.try_get("created_at").map_err(AppError::from)?,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    Ok(Json(logs))
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/// Fetch the full detail of a workout, including joined exercises.
+///
+/// # Errors
+///
+/// Returns [`AppError::NotFound`] if no workout with `id` exists for `user_id`.
+async fn fetch_workout_detail(
+    state: &AppState,
+    id: &str,
+    user_id: &str,
+) -> ApiResult<WorkoutDetail> {
+    let row = sqlx::query(
+        r"SELECT id, date, name, workout_type, duration_mins, rounds,
+                 source_type, source_file, raw_text, year_confidence, created_at, updated_at
+          FROM workouts
+          WHERE id = ? AND user_id = ?",
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?
+    .ok_or(AppError::NotFound)?;
+
+    let ex_rows = sqlx::query(
+        r"SELECT we.id, we.exercise_id, e.name AS exercise_name, e.muscle_groups,
+                 we.reps, we.sets, we.weight_kg, we.weight_note,
+                 we.duration_secs, we.order_index, we.notes
+          FROM workout_exercises we
+          JOIN exercises e ON e.id = we.exercise_id
+          WHERE we.workout_id = ?
+          ORDER BY we.order_index ASC",
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let exercises = ex_rows
+        .into_iter()
+        .map(|r| {
+            let mg_json: String = r.try_get("muscle_groups").map_err(AppError::from)?;
+            let muscle_groups: Vec<String> = serde_json::from_str(&mg_json)
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("muscle_groups parse: {e}")))?;
+            Ok(WorkoutExercise {
+                id: r.try_get("id").map_err(AppError::from)?,
+                exercise_id: r.try_get("exercise_id").map_err(AppError::from)?,
+                exercise_name: r.try_get("exercise_name").map_err(AppError::from)?,
+                muscle_groups,
+                reps: r.try_get("reps").map_err(AppError::from)?,
+                sets: r.try_get("sets").map_err(AppError::from)?,
+                weight_kg: r.try_get("weight_kg").map_err(AppError::from)?,
+                weight_note: r.try_get("weight_note").map_err(AppError::from)?,
+                duration_secs: r.try_get("duration_secs").map_err(AppError::from)?,
+                order_index: r.try_get("order_index").map_err(AppError::from)?,
+                notes: r.try_get("notes").map_err(AppError::from)?,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    Ok(WorkoutDetail {
+        id: row.try_get("id").map_err(AppError::from)?,
+        date: row.try_get("date").map_err(AppError::from)?,
+        name: row.try_get("name").map_err(AppError::from)?,
+        workout_type: row.try_get("workout_type").map_err(AppError::from)?,
+        duration_mins: row.try_get("duration_mins").map_err(AppError::from)?,
+        rounds: row.try_get("rounds").map_err(AppError::from)?,
+        source_type: row.try_get("source_type").map_err(AppError::from)?,
+        source_file: row.try_get("source_file").map_err(AppError::from)?,
+        raw_text: row.try_get("raw_text").map_err(AppError::from)?,
+        year_confidence: row.try_get("year_confidence").map_err(AppError::from)?,
+        created_at: row.try_get("created_at").map_err(AppError::from)?,
+        updated_at: row.try_get("updated_at").map_err(AppError::from)?,
+        exercises,
+    })
+}
+
+/// Insert exercise rows for a workout, upserting by name when needed.
+///
+/// # Errors
+///
+/// Returns [`AppError::BadRequest`] if neither `exercise_id` nor `name` is provided,
+/// or if a given `exercise_id` does not exist.
+async fn insert_exercises(
+    state: &AppState,
+    workout_id: &str,
+    exercises: &[ExerciseInput],
+) -> ApiResult<()> {
+    for (i, ex) in exercises.iter().enumerate() {
+        let exercise_id = if let Some(eid) = &ex.exercise_id {
+            // Verify the exercise exists.
+            let exists = sqlx::query("SELECT id FROM exercises WHERE id = ?")
+                .bind(eid)
+                .fetch_optional(&state.db)
+                .await
+                .map_err(AppError::from)?;
+            if exists.is_none() {
+                return Err(AppError::NotFound);
+            }
+            eid.clone()
+        } else if let Some(name) = &ex.name {
+            let mg_json = serde_json::to_string(&ex.muscle_groups.as_deref().unwrap_or(&[]))
+                .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize muscle_groups: {e}")))?;
+
+            // Upsert by name.
+            sqlx::query("INSERT OR IGNORE INTO exercises (name, muscle_groups) VALUES (?, ?)")
+                .bind(name)
+                .bind(&mg_json)
+                .execute(&state.db)
+                .await
+                .map_err(AppError::from)?;
+
+            let row = sqlx::query("SELECT id FROM exercises WHERE name = ?")
+                .bind(name)
+                .fetch_one(&state.db)
+                .await
+                .map_err(AppError::from)?;
+
+            row.try_get("id").map_err(AppError::from)?
+        } else {
+            return Err(AppError::BadRequest(
+                "Each exercise must have either exercise_id or name".into(),
+            ));
+        };
+
+        let we_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+        #[allow(clippy::cast_possible_wrap)]
+        let order_index = ex.order_index.unwrap_or(i as i64);
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+        sqlx::query(
+            r"INSERT INTO workout_exercises
+              (id, workout_id, exercise_id, reps, sets, weight_kg, weight_note,
+               duration_secs, order_index, notes, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&we_id)
+        .bind(workout_id)
+        .bind(&exercise_id)
+        .bind(ex.reps)
+        .bind(ex.sets)
+        .bind(ex.weight_kg)
+        .bind(ex.weight_note.as_deref())
+        .bind(ex.duration_secs)
+        .bind(order_index)
+        .bind(ex.notes.as_deref())
+        .bind(&now)
+        .execute(&state.db)
+        .await
+        .map_err(AppError::from)?;
+    }
+
+    Ok(())
+}
+
+/// Compute the current streak in days ending at (or including) `today`.
+///
+/// `dates` must be sorted in descending order (most recent first).
+fn compute_streak(dates: &[String], today: &str) -> i64 {
+    if dates.is_empty() {
+        return 0;
+    }
+
+    // Only start a streak if the most recent workout was today or yesterday.
+    let most_recent = &dates[0];
+    let today_date =
+        chrono::NaiveDate::parse_from_str(today, "%Y-%m-%d").unwrap_or(chrono::NaiveDate::MAX);
+    let Ok(most_recent_date) = chrono::NaiveDate::parse_from_str(most_recent, "%Y-%m-%d") else {
+        return 0;
+    };
+
+    // Streak must start within the last 2 days (today or yesterday).
+    if today_date
+        .signed_duration_since(most_recent_date)
+        .num_days()
+        > 1
+    {
+        return 0;
+    }
+
+    let mut streak: i64 = 1;
+    let mut expected = most_recent_date
+        .pred_opt()
+        .unwrap_or(chrono::NaiveDate::MIN);
+
+    for date_str in &dates[1..] {
+        let Ok(d) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") else {
+            break;
+        };
+        if d == expected {
+            streak += 1;
+            expected = d.pred_opt().unwrap_or(chrono::NaiveDate::MIN);
+        } else {
+            break;
+        }
+    }
+
+    streak
+}
