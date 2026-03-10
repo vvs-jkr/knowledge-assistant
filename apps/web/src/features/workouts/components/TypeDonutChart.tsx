@@ -15,7 +15,7 @@ const CHART_COLORS = [
 
 export function TypeDonutChart({ data }: TypeDonutChartProps) {
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height={280}>
       <PieChart>
         <Pie
           data={data}
