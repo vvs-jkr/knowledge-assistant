@@ -1,5 +1,6 @@
 import { AppHeader } from '@/shared/ui/AppHeader'
 import { AppSidebar } from '@/shared/ui/AppSidebar'
+import { useSessionManager } from '@/shared/ui/useSessionManager'
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 
@@ -12,6 +13,7 @@ function getInitialCollapsed(): boolean {
 }
 
 export function AppLayout() {
+  useSessionManager()
   const [collapsed, setCollapsed] = useState(getInitialCollapsed)
 
   const handleToggle = () => {

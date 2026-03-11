@@ -43,12 +43,12 @@ export function WorkoutsMainPanel() {
           <WorkoutFilterBar />
           <div className="flex flex-1 overflow-hidden">
             <div
-              className={`flex flex-col overflow-hidden ${selectedWorkoutId !== null ? 'flex-1' : 'w-full'}`}
+              className={`flex flex-col overflow-hidden ${selectedWorkoutId !== null ? 'flex-1' : 'w-full max-w-3xl'}`}
             >
               <WorkoutTable />
             </div>
             {selectedWorkoutId !== null && (
-              <aside className="w-96 shrink-0 overflow-hidden border-l">
+              <aside className="w-96 shrink-0 overflow-auto border-l">
                 <WorkoutDetailPanel workoutId={selectedWorkoutId} />
               </aside>
             )}

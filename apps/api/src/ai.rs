@@ -16,10 +16,21 @@ const ANTHROPIC_MODEL: &str = "claude-3-5-sonnet-20241022";
 pub struct NoteAnalysis {
     pub summary: String,
     /// Subjective quality score from 1 (poor) to 10 (excellent).
+    /// Stored as f64 to tolerate Claude returning `8.0` instead of `8`.
+    #[serde(deserialize_with = "deserialize_score")]
     pub quality_score: u8,
     pub improvement_suggestions: Vec<String>,
     pub duplicate_candidates: Vec<DuplicateCandidate>,
     pub tags_suggested: Vec<String>,
+}
+
+/// Accepts both integer (`8`) and float (`8.0`) from JSON and converts to `u8`.
+fn deserialize_score<'de, D>(deserializer: D) -> Result<u8, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v = f64::deserialize(deserializer)?;
+    Ok(v.round().clamp(1.0, 10.0) as u8)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
