@@ -82,15 +82,19 @@ describe('WorkoutTable', () => {
     expect(screen.getByText('2026-01-15')).toBeTruthy()
   })
 
-  it('renders em dash for null duration', async () => {
+  it('renders only Date, Name, Type columns', async () => {
     const { useWorkouts: mockUseWorkouts } = await import('../api/workouts.api')
     vi.mocked(mockUseWorkouts).mockReturnValue({
-      data: [{ ...baseWorkout, duration_mins: null, rounds: null }],
+      data: [baseWorkout],
       isLoading: false,
     } as unknown as ReturnType<typeof useWorkouts>)
     render(<WorkoutTable />)
-    // Both duration_mins and rounds are null, so two '—' cells appear
-    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Date')).toBeTruthy()
+    expect(screen.getByText('Name')).toBeTruthy()
+    expect(screen.getByText('Type')).toBeTruthy()
+    expect(screen.queryByText('Duration')).toBeNull()
+    expect(screen.queryByText('Rounds')).toBeNull()
+    expect(screen.queryByText('Source')).toBeNull()
   })
 
   it('clicking a row calls selectWorkout with row id', async () => {
@@ -116,13 +120,18 @@ describe('WorkoutTable', () => {
     expect(screen.getByText('for_time')).toBeTruthy()
   })
 
-  it('renders duration when not null', async () => {
+  it('shows pagination when more than 15 workouts', async () => {
     const { useWorkouts: mockUseWorkouts } = await import('../api/workouts.api')
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      ...baseWorkout,
+      id: `workout-${i}`,
+      name: `WOD ${i}`,
+    }))
     vi.mocked(mockUseWorkouts).mockReturnValue({
-      data: [{ ...baseWorkout, rounds: null, duration_mins: 20 }],
+      data: many,
       isLoading: false,
     } as unknown as ReturnType<typeof useWorkouts>)
     render(<WorkoutTable />)
-    expect(screen.getByText('20 min')).toBeTruthy()
+    expect(screen.getByText('1 / 2')).toBeTruthy()
   })
 })

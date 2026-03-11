@@ -53,7 +53,7 @@ async fn register_success_returns_token_and_cookie() {
     let cookie = res.header("set-cookie").to_str().unwrap().to_string();
     assert!(cookie.contains("refresh_token="));
     assert!(cookie.contains("HttpOnly"));
-    assert!(cookie.contains("SameSite=Strict"));
+    assert!(cookie.contains("SameSite=Lax"));
 }
 
 #[tokio::test]
