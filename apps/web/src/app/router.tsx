@@ -4,6 +4,7 @@ import { HealthPage } from '@/pages/health/HealthPage'
 import { NotesPage } from '@/pages/notes/NotesPage'
 import { WorkoutDetailPage } from '@/pages/workouts/WorkoutDetailPage'
 import { WorkoutsPage } from '@/pages/workouts/WorkoutsPage'
+import { AppLayout } from '@/shared/ui/AppLayout'
 import { ProtectedRoute } from '@/shared/ui/ProtectedRoute'
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom'
 
@@ -14,11 +15,16 @@ const router = createBrowserRouter([
     path: '/',
     element: <ProtectedRoute />,
     children: [
-      { index: true, element: <Navigate to="/notes" replace /> },
-      { path: 'notes', element: <NotesPage /> },
-      { path: 'health', element: <HealthPage /> },
-      { path: 'workouts', element: <WorkoutsPage /> },
-      { path: 'workouts/:id', element: <WorkoutDetailPage /> },
+      {
+        element: <AppLayout />,
+        children: [
+          { index: true, element: <Navigate to="/notes" replace /> },
+          { path: 'notes', element: <NotesPage /> },
+          { path: 'health', element: <HealthPage /> },
+          { path: 'workouts', element: <WorkoutsPage /> },
+          { path: 'workouts/:id', element: <WorkoutDetailPage /> },
+        ],
+      },
     ],
   },
 ])

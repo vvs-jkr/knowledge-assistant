@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -10,6 +11,7 @@ import {
 } from '@/components/ui/table'
 import { useWorkouts } from '@/features/workouts/api/workouts.api'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
+import { cn } from '@/lib/utils'
 import type { WorkoutSummary } from '@/shared/schemas/workouts.schema'
 import {
   type SortingState,
@@ -19,8 +21,10 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { ArrowUpDown } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
+
+const PAGE_SIZE = 15
 
 const columnHelper = createColumnHelper<WorkoutSummary>()
 
@@ -39,33 +43,14 @@ const columns = [
     header: 'Type',
     cell: (info) => <Badge variant="secondary">{info.getValue()}</Badge>,
   }),
-  columnHelper.accessor('duration_mins', {
-    header: 'Duration',
-    cell: (info) => {
-      const val = info.getValue()
-      return val !== null ? `${val} min` : '—'
-    },
-  }),
-  columnHelper.accessor('rounds', {
-    header: 'Rounds',
-    cell: (info) => {
-      const val = info.getValue()
-      return val !== null ? val : '—'
-    },
-  }),
-  columnHelper.accessor('exercise_count', {
-    header: 'Exercises',
-    cell: (info) => info.getValue(),
-  }),
-  columnHelper.accessor('source_type', {
-    header: 'Source',
-    cell: (info) => <Badge variant="outline">{info.getValue()}</Badge>,
-  }),
 ]
 
 export function WorkoutTable() {
   const filters = useWorkoutsStore((s) => s.filters)
   const selectWorkout = useWorkoutsStore((s) => s.selectWorkout)
+  const selectedWorkoutId = useWorkoutsStore((s) => s.selectedWorkoutId)
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [page, setPage] = useState(0)
 
   const queryParams = {
     ...(filters.workout_type !== null ? { workout_type: filters.workout_type } : {}),
@@ -74,13 +59,15 @@ export function WorkoutTable() {
   }
 
   const { data: workouts, isLoading } = useWorkouts(queryParams)
-  const [sorting, setSorting] = useState<SortingState>([])
 
   const table = useReactTable({
     data: workouts ?? [],
     columns,
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      setSorting(updater)
+      setPage(0)
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   })
@@ -103,51 +90,95 @@ export function WorkoutTable() {
     )
   }
 
+  const allRows = table.getRowModel().rows
+  const totalPages = Math.ceil(allRows.length / PAGE_SIZE)
+  const pageRows = allRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   return (
-    <div className="overflow-auto">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((hg) => (
-            <TableRow key={hg.id}>
-              {hg.headers.map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder ? null : (
-                    <button
-                      type="button"
-                      className={
-                        header.column.getCanSort()
-                          ? 'flex cursor-pointer items-center gap-1 select-none'
-                          : undefined
-                      }
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {header.column.getCanSort() && (
-                        <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
-                      )}
-                    </button>
+    <div className="flex flex-col overflow-hidden">
+      <div className="overflow-auto">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((hg) => (
+              <TableRow key={hg.id}>
+                {hg.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : (
+                      <button
+                        type="button"
+                        className={
+                          header.column.getCanSort()
+                            ? 'flex cursor-pointer select-none items-center gap-1'
+                            : undefined
+                        }
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {header.column.getCanSort() && (
+                          <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </button>
+                    )}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {pageRows.map((row) => {
+              const isSelected = row.original.id === selectedWorkoutId
+              return (
+                <TableRow
+                  key={row.id}
+                  className={cn(
+                    'cursor-pointer',
+                    isSelected ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-muted/50'
                   )}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow
-              key={row.id}
-              className="cursor-pointer hover:bg-muted/50"
-              onClick={() => selectWorkout(row.original.id)}
+                  onClick={() => selectWorkout(row.original.id)}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex shrink-0 items-center justify-between border-t px-4 py-2 text-sm text-muted-foreground">
+          <span>
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, allRows.length)} of{' '}
+            {allRows.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
             >
-              {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span>
+              {page + 1} / {totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

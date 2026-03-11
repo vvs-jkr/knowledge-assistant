@@ -141,7 +141,7 @@ pub async fn analyze_note(
             AppError::Internal(anyhow::anyhow!("No text block in Anthropic response"))
         })?;
 
-    serde_json::from_str::<NoteAnalysis>(text)
+    serde_json::from_str::<NoteAnalysis>(extract_json_object(text))
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to parse analysis JSON: {e}")))
 }
 
@@ -253,7 +253,7 @@ pub async fn extract_lab_metrics(
             AppError::Internal(anyhow::anyhow!("No text block in Anthropic PDF response"))
         })?;
 
-    serde_json::from_str::<LabExtraction>(text).map_err(|e| {
+    serde_json::from_str::<LabExtraction>(extract_json_object(text)).map_err(|e| {
         AppError::Internal(anyhow::anyhow!("Failed to parse lab extraction JSON: {e}"))
     })
 }
@@ -300,6 +300,45 @@ Rules:
 - reference_min / reference_max: null if the PDF does not provide a reference range
 - value: numeric, floating point"#
         .into()
+}
+
+// ---------------------------------------------------------------------------
+// Response helpers
+// ---------------------------------------------------------------------------
+
+/// Extracts the outermost JSON object `{...}` from an LLM response string.
+///
+/// Claude sometimes wraps the JSON in markdown code fences (` ```json...``` `)
+/// or adds preamble text. This function strips fences and finds the JSON boundaries.
+fn extract_json_object(text: &str) -> &str {
+    // First strip any markdown code fences.
+    let text = text.trim();
+    let inner = if let Some(rest) = text.strip_prefix("```json").or_else(|| text.strip_prefix("```")) {
+        // Skip to end of opening fence line.
+        let after_fence = match rest.find('\n') {
+            Some(pos) => &rest[pos + 1..],
+            None => rest,
+        };
+        // Strip closing fence.
+        after_fence
+            .trim_end()
+            .strip_suffix("```")
+            .unwrap_or(after_fence)
+            .trim()
+    } else {
+        text
+    };
+
+    // Find the outermost { ... } block.
+    if let Some(start) = inner.find('{') {
+        if let Some(end) = inner.rfind('}') {
+            if end >= start {
+                return &inner[start..=end];
+            }
+        }
+    }
+
+    inner
 }
 
 // ---------------------------------------------------------------------------

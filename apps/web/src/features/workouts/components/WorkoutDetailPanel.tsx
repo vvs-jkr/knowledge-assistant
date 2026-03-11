@@ -3,6 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useWorkout } from '@/features/workouts/api/workouts.api'
 import { LogWorkoutDialog } from '@/features/workouts/components/LogWorkoutDialog'
 import { WorkoutExerciseList } from '@/features/workouts/components/WorkoutExerciseList'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
 interface WorkoutDetailPanelProps {
@@ -43,7 +44,6 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
         <Badge variant="secondary">{workout.workout_type}</Badge>
         {workout.duration_mins !== null && <span>{workout.duration_mins} min</span>}
         {workout.rounds !== null && <span>{workout.rounds} rounds</span>}
-        <Badge variant="outline">{workout.source_type}</Badge>
       </div>
 
       <WorkoutExerciseList exercises={workout.exercises} />
@@ -52,9 +52,14 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
         <div className="rounded-md border">
           <button
             type="button"
-            className="w-full px-4 py-2 text-left text-sm font-medium hover:bg-muted/50"
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-medium hover:bg-muted/50"
             onClick={() => setShowRaw((prev) => !prev)}
           >
+            {showRaw ? (
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            )}
             {showRaw ? 'Hide original' : 'Show original'}
           </button>
           {showRaw && (

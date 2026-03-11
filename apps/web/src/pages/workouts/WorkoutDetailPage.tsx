@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { useWorkoutLogs } from '@/features/workouts/api/workouts.api'
 import { WorkoutDetailPanel } from '@/features/workouts/components/WorkoutDetailPanel'
-import { AppHeader } from '@/shared/ui/AppHeader'
 import { useNavigate, useParams } from 'react-router-dom'
 
 export function WorkoutDetailPage() {
@@ -14,8 +13,7 @@ export function WorkoutDetailPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col">
-      <AppHeader />
+    <div className="flex h-full w-full flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-3 border-b px-6 py-2">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           ← Back
@@ -40,7 +38,7 @@ export function WorkoutDetailPage() {
                     <div className="text-muted-foreground">{log.rounds_completed} rounds</div>
                   )}
                   {log.notes !== null && (
-                    <div className="mt-1 text-muted-foreground italic">{log.notes}</div>
+                    <div className="mt-1 italic text-muted-foreground">{log.notes}</div>
                   )}
                 </li>
               ))}

@@ -15,18 +15,18 @@ export function WorkoutExerciseList({ exercises }: WorkoutExerciseListProps) {
   }
 
   return (
-    <ul className="flex flex-col gap-3">
+    <ul className="flex flex-col divide-y">
       {exercises.map((ex) => (
-        <li key={ex.id} className="rounded-md border p-3">
-          <div className="mb-1 flex flex-wrap items-center gap-2">
-            <span className="font-semibold">{ex.exercise_name}</span>
+        <li key={ex.id} className="flex flex-col gap-1 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">{ex.exercise_name}</span>
             {ex.muscle_groups.map((mg) => (
-              <Badge key={mg} variant="secondary" className="text-xs">
+              <Badge key={mg} variant="secondary" className="h-4 text-xs">
                 {mg}
               </Badge>
             ))}
           </div>
-          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {ex.reps !== null && ex.sets !== null && (
               <span>
                 {ex.reps} reps × {ex.sets} sets
@@ -34,10 +34,10 @@ export function WorkoutExerciseList({ exercises }: WorkoutExerciseListProps) {
             )}
             {ex.reps !== null && ex.sets === null && <span>{ex.reps} reps</span>}
             {ex.reps === null && ex.sets !== null && <span>{ex.sets} sets</span>}
-            {ex.weight_kg !== null && <span>{ex.weight_kg} kg</span>}
-            {ex.weight_note !== null && <span>{ex.weight_note}</span>}
-            {ex.duration_secs !== null && <span>{ex.duration_secs}s</span>}
-            {ex.notes !== null && <span className="italic">{ex.notes}</span>}
+            {ex.weight_kg !== null && <span>· {ex.weight_kg} kg</span>}
+            {ex.weight_note !== null && <span>· {ex.weight_note}</span>}
+            {ex.duration_secs !== null && <span>· {ex.duration_secs}s</span>}
+            {ex.notes !== null && <span className="italic">({ex.notes})</span>}
           </div>
         </li>
       ))}
