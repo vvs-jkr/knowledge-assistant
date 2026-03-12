@@ -57,8 +57,8 @@ export function NoteAnalysisDialog({ noteId }: NoteAnalysisDialogProps) {
           <div className="flex flex-col items-center gap-3 py-4">
             <p className="text-sm text-destructive">
               {axios.isAxiosError(analyzeMutation.error)
-                ? (analyzeMutation.error.response?.data as { error?: string })?.error ??
-                  `HTTP ${analyzeMutation.error.response?.status ?? 'error'}`
+                ? ((analyzeMutation.error.response?.data as { error?: string })?.error ??
+                  `HTTP ${analyzeMutation.error.response?.status ?? 'error'}`)
                 : 'Analysis failed'}
             </p>
             <Button variant="outline" size="sm" onClick={() => analyzeMutation.mutate(noteId)}>
