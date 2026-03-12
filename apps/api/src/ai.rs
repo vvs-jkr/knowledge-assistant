@@ -30,6 +30,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let v = f64::deserialize(deserializer)?;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     Ok(v.round().clamp(1.0, 10.0) as u8)
 }
 

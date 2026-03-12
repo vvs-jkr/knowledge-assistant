@@ -134,6 +134,8 @@ async fn upload_health(
     let user_id = &claims.sub;
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
+    let mut tx = state.db.begin().await.map_err(AppError::from)?;
+
     sqlx::query!(
         r#"INSERT INTO health_records
            (id, user_id, filename, lab_date, lab_name, encrypted_pdf, nonce, pdf_size_bytes, created_at, updated_at)
@@ -149,7 +151,7 @@ async fn upload_health(
         now,
         now,
     )
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await
     .map_err(AppError::from)?;
 
@@ -187,7 +189,7 @@ async fn upload_health(
             metric_nonce,
             now,
         )
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
 
@@ -203,6 +205,8 @@ async fn upload_health(
             status: extracted.status.clone(),
         });
     }
+
+    tx.commit().await.map_err(AppError::from)?;
 
     let metrics_count = i64::try_from(metrics.len())
         .map_err(|e| AppError::Internal(anyhow::anyhow!("metrics count overflow: {e}")))?;

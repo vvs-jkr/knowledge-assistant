@@ -124,6 +124,8 @@ async fn create_workout(
     let workout_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
+    let mut tx = state.db.begin().await.map_err(AppError::from)?;
+
     sqlx::query(
         r"INSERT INTO workouts
           (id, user_id, date, name, workout_type, duration_mins, rounds,
@@ -143,14 +145,16 @@ async fn create_workout(
     .bind(body.year_confidence)
     .bind(&now)
     .bind(&now)
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await
     .map_err(AppError::from)?;
 
     // Insert exercises if provided.
     if let Some(exercises) = &body.exercises {
-        insert_exercises(&state, &workout_id, exercises).await?;
+        insert_exercises(&mut tx, &workout_id, exercises).await?;
     }
+
+    tx.commit().await.map_err(AppError::from)?;
 
     let detail = fetch_workout_detail(&state, &workout_id, &claims.sub).await?;
     Ok((StatusCode::CREATED, Json(detail)))
@@ -208,6 +212,8 @@ async fn update_workout(
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
+    let mut tx = state.db.begin().await.map_err(AppError::from)?;
+
     sqlx::query(
         r"UPDATE workouts SET
             date            = COALESCE(?, date),
@@ -239,7 +245,7 @@ async fn update_workout(
     .bind(&now)
     .bind(&id)
     .bind(&claims.sub)
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await
     .map_err(AppError::from)?;
 
@@ -247,12 +253,14 @@ async fn update_workout(
     if let Some(exercises) = &body.exercises {
         sqlx::query("DELETE FROM workout_exercises WHERE workout_id = ?")
             .bind(&id)
-            .execute(&state.db)
+            .execute(&mut *tx)
             .await
             .map_err(AppError::from)?;
 
-        insert_exercises(&state, &id, exercises).await?;
+        insert_exercises(&mut tx, &id, exercises).await?;
     }
+
+    tx.commit().await.map_err(AppError::from)?;
 
     let detail = fetch_workout_detail(&state, &id, &claims.sub).await?;
     Ok(Json(detail))
@@ -699,7 +707,7 @@ async fn fetch_workout_detail(
 /// Returns [`AppError::BadRequest`] if neither `exercise_id` nor `name` is provided,
 /// or if a given `exercise_id` does not exist.
 async fn insert_exercises(
-    state: &AppState,
+    conn: &mut sqlx::SqliteConnection,
     workout_id: &str,
     exercises: &[ExerciseInput],
 ) -> ApiResult<()> {
@@ -708,7 +716,7 @@ async fn insert_exercises(
             // Verify the exercise exists.
             let exists = sqlx::query("SELECT id FROM exercises WHERE id = ?")
                 .bind(eid)
-                .fetch_optional(&state.db)
+                .fetch_optional(&mut *conn)
                 .await
                 .map_err(AppError::from)?;
             if exists.is_none() {
@@ -723,13 +731,13 @@ async fn insert_exercises(
             sqlx::query("INSERT OR IGNORE INTO exercises (name, muscle_groups) VALUES (?, ?)")
                 .bind(name)
                 .bind(&mg_json)
-                .execute(&state.db)
+                .execute(&mut *conn)
                 .await
                 .map_err(AppError::from)?;
 
             let row = sqlx::query("SELECT id FROM exercises WHERE name = ?")
                 .bind(name)
-                .fetch_one(&state.db)
+                .fetch_one(&mut *conn)
                 .await
                 .map_err(AppError::from)?;
 
@@ -762,7 +770,7 @@ async fn insert_exercises(
         .bind(order_index)
         .bind(ex.notes.as_deref())
         .bind(&now)
-        .execute(&state.db)
+        .execute(&mut *conn)
         .await
         .map_err(AppError::from)?;
     }
