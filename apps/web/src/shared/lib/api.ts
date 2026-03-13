@@ -1,6 +1,12 @@
 import { useAuthStore } from '@/features/auth/store/auth.store'
 import axios from 'axios'
 
+declare module 'axios' {
+  interface InternalAxiosRequestConfig {
+    _retry?: boolean
+  }
+}
+
 export const api = axios.create({
   // biome-ignore lint/complexity/useLiteralKeys: noPropertyAccessFromIndexSignature requires bracket notation
   baseURL: import.meta.env['VITE_API_URL'] ?? 'http://localhost:8080',

@@ -1,9 +1,13 @@
 import { api } from '@/shared/lib/api'
-import type {
-  HealthMetric,
-  HealthRecordMeta,
-  MetricsQuery,
-  UploadHealthResponse,
+import { downloadBlob } from '@/shared/lib/download'
+import {
+  type HealthMetric,
+  type HealthRecordMeta,
+  type MetricsQuery,
+  type UploadHealthResponse,
+  healthMetricSchema,
+  healthRecordMetaSchema,
+  uploadHealthResponseSchema,
 } from '@/shared/schemas/health.schema'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -13,15 +17,22 @@ const healthApi = {
     form.append('file', file)
     form.append('lab_date', labDate)
     if (labName) form.append('lab_name', labName)
-    return api.post<UploadHealthResponse>('/health/upload', form).then((r) => r.data)
+    return api
+      .post<UploadHealthResponse>('/health/upload', form)
+      .then((r) => uploadHealthResponseSchema.parse(r.data))
   },
 
-  records: () => api.get<HealthRecordMeta[]>('/health/records').then((r) => r.data),
+  records: () =>
+    api
+      .get<HealthRecordMeta[]>('/health/records')
+      .then((r) => healthRecordMetaSchema.array().parse(r.data)),
 
   deleteRecord: (id: string) => api.delete(`/health/records/${id}`),
 
   metrics: (params?: MetricsQuery) =>
-    api.get<HealthMetric[]>('/health/metrics', { params }).then((r) => r.data),
+    api
+      .get<HealthMetric[]>('/health/metrics', { params })
+      .then((r) => healthMetricSchema.array().parse(r.data)),
 
   export: (params?: MetricsQuery): Promise<Blob> =>
     api.get('/health/export', { params, responseType: 'blob' }).then((r) => r.data as Blob),
@@ -76,12 +87,7 @@ export function useDeleteHealthRecord() {
 export async function exportHealthMarkdown(params?: MetricsQuery): Promise<void> {
   const blob = await healthApi.export(params)
   const today = new Date().toISOString().slice(0, 10)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `health-export-${today}.md`
-  a.click()
-  URL.revokeObjectURL(url)
+  downloadBlob(blob, `health-export-${today}.md`)
 }
 
 export { healthApi }

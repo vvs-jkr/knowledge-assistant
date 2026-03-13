@@ -259,8 +259,14 @@ async fn create_session(
 }
 
 fn validate_email(email: &str) -> ApiResult<()> {
-    if !email.contains('@') || !email.contains('.') {
-        return Err(AppError::BadRequest("Invalid email".into()));
+    let err = || AppError::BadRequest("Invalid email".into());
+    let (local, domain) = email.split_once('@').ok_or_else(err)?;
+    if local.is_empty() {
+        return Err(err());
+    }
+    let dot_pos = domain.rfind('.').ok_or_else(err)?;
+    if dot_pos == 0 || dot_pos == domain.len() - 1 {
+        return Err(err());
     }
     Ok(())
 }
