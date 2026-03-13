@@ -517,6 +517,7 @@ async fn analyze_note_handler(
     let analysis = ai::analyze_note(
         &state.http_client,
         &state.anthropic_api_key,
+        &state.anthropic_model,
         &content,
         &row.filename,
         &other_notes_context,

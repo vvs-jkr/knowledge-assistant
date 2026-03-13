@@ -61,6 +61,7 @@ pub async fn build_test_state() -> config::AppState {
             jwt_secret: "test_secret_32_bytes_long_enough!".into(),
             encryption_key: "0".repeat(64),
             anthropic_api_key: String::new(),
+            anthropic_model: "claude-sonnet-4-6".into(),
             voyage_api_key: String::new(),
             frontend_url: "http://localhost:5173".into(),
             port: 8080,

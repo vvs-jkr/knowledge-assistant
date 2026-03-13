@@ -120,6 +120,7 @@ async fn upload_health(
     let extraction = ai::extract_lab_metrics(
         &state.http_client,
         &state.anthropic_api_key,
+        &state.anthropic_model,
         &pdf_base64,
         &pdf_filename,
     )

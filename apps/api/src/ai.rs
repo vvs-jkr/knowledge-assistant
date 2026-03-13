@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
-const ANTHROPIC_MODEL: &str = "claude-3-5-sonnet-20241022";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -104,6 +103,7 @@ struct ContentBlock {
 pub async fn analyze_note(
     http_client: &reqwest::Client,
     anthropic_api_key: &str,
+    anthropic_model: &str,
     note_content: &str,
     note_filename: &str,
     other_notes_context: &str,
@@ -112,7 +112,7 @@ pub async fn analyze_note(
     let user_content = build_user_message(note_content, note_filename, other_notes_context);
 
     let request = AnthropicRequest {
-        model: ANTHROPIC_MODEL,
+        model: anthropic_model,
         max_tokens: 2048,
         system: &system,
         messages: vec![AnthropicMessage {
@@ -201,6 +201,7 @@ fn build_user_message(content: &str, filename: &str, other_notes_context: &str) 
 pub async fn extract_lab_metrics(
     http_client: &reqwest::Client,
     anthropic_api_key: &str,
+    anthropic_model: &str,
     pdf_base64: &str,
     pdf_filename: &str,
 ) -> ApiResult<LabExtraction> {
@@ -223,7 +224,7 @@ pub async fn extract_lab_metrics(
     ];
 
     let request = PdfAnthropicRequest {
-        model: ANTHROPIC_MODEL,
+        model: anthropic_model,
         max_tokens: 4096,
         system: &system,
         messages: vec![PdfMessage {
