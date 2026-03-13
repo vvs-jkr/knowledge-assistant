@@ -1,10 +1,11 @@
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     http::{header, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 
 use crate::{
     ai,
@@ -135,39 +136,54 @@ async fn upload_note(
 // GET /notes
 // ---------------------------------------------------------------------------
 
+#[derive(Deserialize, Default)]
+struct NotesQuery {
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
 async fn list_notes(
     AuthUser(claims): AuthUser,
     State(state): State<AppState>,
+    Query(params): Query<NotesQuery>,
 ) -> ApiResult<Json<Vec<NoteMetadata>>> {
-    let rows = sqlx::query!(
-        r#"SELECT id, filename, mime_type, size_bytes, frontmatter, created_at, updated_at
+    use sqlx::Row as _;
+
+    let limit = params.limit.unwrap_or(100).min(200);
+    let offset = params.offset.unwrap_or(0);
+
+    let rows = sqlx::query(
+        r"SELECT id, filename, mime_type, size_bytes, frontmatter, created_at, updated_at
            FROM note_files
            WHERE user_id = ?
-           ORDER BY updated_at DESC"#,
-        claims.sub,
+           ORDER BY updated_at DESC
+           LIMIT ? OFFSET ?",
     )
+    .bind(&claims.sub)
+    .bind(limit)
+    .bind(offset)
     .fetch_all(&state.db)
     .await
     .map_err(AppError::from)?;
 
     let notes = rows
         .into_iter()
-        .map(|r| {
-            let frontmatter = r
-                .frontmatter
+        .map(|r| -> ApiResult<NoteMetadata> {
+            let frontmatter_str: Option<String> = r.try_get("frontmatter").map_err(AppError::from)?;
+            let frontmatter = frontmatter_str
                 .as_deref()
                 .and_then(|s| serde_json::from_str(s).ok());
-            NoteMetadata {
-                id: r.id.unwrap_or_default(),
-                filename: r.filename,
-                mime_type: r.mime_type,
-                size_bytes: r.size_bytes,
+            Ok(NoteMetadata {
+                id: r.try_get("id").map_err(AppError::from)?,
+                filename: r.try_get("filename").map_err(AppError::from)?,
+                mime_type: r.try_get("mime_type").map_err(AppError::from)?,
+                size_bytes: r.try_get("size_bytes").map_err(AppError::from)?,
                 frontmatter,
-                created_at: r.created_at,
-                updated_at: r.updated_at,
-            }
+                created_at: r.try_get("created_at").map_err(AppError::from)?,
+                updated_at: r.try_get("updated_at").map_err(AppError::from)?,
+            })
         })
-        .collect();
+        .collect::<ApiResult<Vec<_>>>()?;
 
     Ok(Json(notes))
 }

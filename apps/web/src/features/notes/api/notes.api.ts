@@ -15,7 +15,8 @@ const notesApi = {
     return api.post<NoteMetadata[]>('/notes/upload', form).then((r) => r.data)
   },
 
-  list: () => api.get<NoteMetadata[]>('/notes').then((r) => r.data),
+  list: (limit = 100, offset = 0) =>
+    api.get<NoteMetadata[]>('/notes', { params: { limit, offset } }).then((r) => r.data),
 
   get: (id: string) => api.get<NoteWithContent>(`/notes/${id}`).then((r) => r.data),
 
@@ -34,10 +35,10 @@ const notesApi = {
     api.post<AnalyzeResponse>(`/notes/${noteId}/analyze`).then((r) => r.data),
 }
 
-export function useNotes() {
+export function useNotes(limit = 100, offset = 0) {
   return useQuery({
-    queryKey: ['notes'],
-    queryFn: notesApi.list,
+    queryKey: ['notes', { limit, offset }],
+    queryFn: () => notesApi.list(limit, offset),
     staleTime: 30_000,
   })
 }
