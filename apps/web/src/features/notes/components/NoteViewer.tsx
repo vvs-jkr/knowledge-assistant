@@ -16,6 +16,7 @@ import { downloadNote, useDeleteNote, useNote } from '@/features/notes/api/notes
 import { NoteAnalysisDialog } from '@/features/notes/components/NoteAnalysisDialog'
 import { useNotesStore } from '@/features/notes/store/notes.store'
 import { Download, Edit, Trash2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import { toast } from 'sonner'
 
 export function NoteViewer() {
@@ -110,8 +111,19 @@ export function NoteViewer() {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-6">
-        <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{note.content}</pre>
+      <div className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-3xl px-8 py-6">
+          <div
+            className="prose prose-sm dark:prose-invert max-w-none
+              prose-headings:font-semibold prose-headings:tracking-tight
+              prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg
+              prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5
+              prose-pre:bg-muted prose-pre:rounded-lg
+              prose-blockquote:border-l-primary"
+          >
+            <ReactMarkdown>{note.content}</ReactMarkdown>
+          </div>
+        </div>
       </div>
     </div>
   )
