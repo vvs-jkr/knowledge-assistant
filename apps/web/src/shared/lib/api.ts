@@ -25,7 +25,8 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config
-    const isAuthEndpoint = original.url?.startsWith('/auth/')
+    const isAuthEndpoint =
+      original.url === '/auth/login' || original.url === '/auth/register'
     if (err.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true
       try {
