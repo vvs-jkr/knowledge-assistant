@@ -19,7 +19,7 @@ impl AppConfig {
             encryption_key: require_env("ENCRYPTION_KEY")?,
             anthropic_api_key: require_env("ANTHROPIC_API_KEY")?,
             anthropic_model: std::env::var("ANTHROPIC_MODEL")
-                .unwrap_or_else(|_| "claude-sonnet-4-6".into()),
+                .unwrap_or_else(|_| "anthropic/claude-sonnet-4-5".into()),
             voyage_api_key: std::env::var("VOYAGE_API_KEY").unwrap_or_default(),
             frontend_url: std::env::var("FRONTEND_URL")
                 .unwrap_or_else(|_| "http://localhost:5173".into()),
