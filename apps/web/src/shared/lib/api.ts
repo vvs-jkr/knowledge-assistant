@@ -20,12 +20,13 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// При 401 — пробуем обновить токен
+// При 401 — пробуем обновить токен (не для auth-эндпоинтов)
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config
-    if (err.response?.status === 401 && !original._retry) {
+    const isAuthEndpoint = original.url?.startsWith('/auth/')
+    if (err.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true
       try {
         const { data } = await api.post('/auth/refresh')
@@ -34,6 +35,7 @@ api.interceptors.response.use(
       } catch {
         useAuthStore.getState().clearAuth()
         window.location.href = '/login'
+        return Promise.reject(err)
       }
     }
     return Promise.reject(err)
