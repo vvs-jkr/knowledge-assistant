@@ -50,6 +50,10 @@ export const analyzeResponseSchema = z.object({
   analysis: noteAnalysisSchema,
 })
 
+export const improveResponseSchema = z.object({
+  improved_content: z.string(),
+})
+
 export type NoteMetadata = z.infer<typeof noteMetadataSchema>
 export type NoteWithContent = z.infer<typeof noteWithContentSchema>
 export type UpdateNoteInput = z.infer<typeof updateNoteSchema>
@@ -57,3 +61,4 @@ export type SearchResult = z.infer<typeof searchResultSchema>
 export type DuplicateCandidate = z.infer<typeof duplicateCandidateSchema>
 export type NoteAnalysis = z.infer<typeof noteAnalysisSchema>
 export type AnalyzeResponse = z.infer<typeof analyzeResponseSchema>
+export type ImproveResponse = z.infer<typeof improveResponseSchema>

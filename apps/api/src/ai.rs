@@ -339,6 +339,43 @@ fn extract_json_object(text: &str) -> &str {
 }
 
 // ---------------------------------------------------------------------------
+// Note improvement
+// ---------------------------------------------------------------------------
+
+/// Rewrites `note_content` using the AI to improve structure, clarity, and style.
+///
+/// Returns the improved Markdown text. The model responds in the same language
+/// as the original note.
+pub async fn improve_note(
+    http_client: &reqwest::Client,
+    api_key: &str,
+    model: &str,
+    note_content: &str,
+) -> ApiResult<String> {
+    call_openrouter(
+        http_client,
+        api_key,
+        model,
+        &improve_system_prompt(),
+        serde_json::Value::String(note_content.to_owned()),
+        4096,
+    )
+    .await
+}
+
+fn improve_system_prompt() -> String {
+    r#"You are an expert technical writer and knowledge manager. The user will provide a note in Markdown format. Improve it:
+- Fix grammar, spelling, and style
+- Improve structure with proper headings, lists, and formatting
+- Make it clearer and more concise
+- Preserve all original information — do not invent or omit facts
+- Keep existing YAML frontmatter intact (do not remove or modify it)
+- Return ONLY the improved Markdown content — no explanations, no code fences
+Respond in the same language as the original note."#
+        .into()
+}
+
+// ---------------------------------------------------------------------------
 // Workout generation
 // ---------------------------------------------------------------------------
 

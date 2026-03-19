@@ -30,6 +30,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/notes/:id/download", get(download_note))
         .route("/notes/:id/analyze", post(analyze_note_handler))
+        .route("/notes/:id/improve", post(improve_note_handler))
 }
 
 // ---------------------------------------------------------------------------
@@ -541,6 +542,54 @@ async fn analyze_note_handler(
     .await?;
 
     Ok(Json(AnalyzeResponse { analysis }))
+}
+
+// ---------------------------------------------------------------------------
+// POST /notes/:id/improve
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+struct ImproveResponse {
+    improved_content: String,
+}
+
+async fn improve_note_handler(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<ImproveResponse>> {
+    if state.anthropic_api_key.is_empty() {
+        return Err(AppError::BadRequest(
+            "AI is not configured (missing API key)".into(),
+        ));
+    }
+
+    let row = sqlx::query(
+        "SELECT encrypted_content, nonce FROM note_files WHERE id = ? AND user_id = ?",
+    )
+    .bind(&id)
+    .bind(&claims.sub)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?
+    .ok_or(AppError::NotFound)?;
+
+    use sqlx::Row as _;
+    let encrypted_content: Vec<u8> = row.try_get("encrypted_content").map_err(AppError::from)?;
+    let nonce: Vec<u8> = row.try_get("nonce").map_err(AppError::from)?;
+    let plaintext = crypto::decrypt(&state.encryption_key, &encrypted_content, &nonce)?;
+    let content = String::from_utf8(plaintext)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("utf8: {e}")))?;
+
+    let improved_content = ai::improve_note(
+        &state.http_client,
+        &state.anthropic_api_key,
+        &state.anthropic_model,
+        &content,
+    )
+    .await?;
+
+    Ok(Json(ImproveResponse { improved_content }))
 }
 
 // ---------------------------------------------------------------------------

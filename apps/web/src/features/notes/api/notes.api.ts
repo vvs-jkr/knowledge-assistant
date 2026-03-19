@@ -2,11 +2,13 @@ import { api } from '@/shared/lib/api'
 import { downloadBlob } from '@/shared/lib/download'
 import {
   type AnalyzeResponse,
+  type ImproveResponse,
   type NoteMetadata,
   type NoteWithContent,
   type SearchResult,
   type UpdateNoteInput,
   analyzeResponseSchema,
+  improveResponseSchema,
   noteMetadataSchema,
   noteWithContentSchema,
   searchResultSchema,
@@ -47,6 +49,11 @@ const notesApi = {
     api
       .post<AnalyzeResponse>(`/notes/${noteId}/analyze`)
       .then((r) => analyzeResponseSchema.parse(r.data)),
+
+  improve: (noteId: string) =>
+    api
+      .post<ImproveResponse>(`/notes/${noteId}/improve`)
+      .then((r) => improveResponseSchema.parse(r.data)),
 }
 
 export function useNotes(limit = 100, offset = 0) {
@@ -102,6 +109,20 @@ export function useSearchNotes() {
 export function useAnalyzeNote() {
   return useMutation({
     mutationFn: (noteId: string) => notesApi.analyze(noteId),
+  })
+}
+
+export function useImproveNote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (noteId: string) => {
+      const { improved_content } = await notesApi.improve(noteId)
+      return notesApi.update(noteId, { content: improved_content })
+    },
+    onSuccess: (_data, noteId) => {
+      qc.invalidateQueries({ queryKey: ['notes'] })
+      qc.invalidateQueries({ queryKey: ['notes', noteId] })
+    },
   })
 }
 
