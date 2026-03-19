@@ -112,7 +112,7 @@ export function NoteViewer() {
       )}
 
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-3xl px-8 py-6">
+        <div className="px-8 py-6">
           <div
             className="prose prose-sm dark:prose-invert max-w-none
               prose-headings:font-semibold prose-headings:tracking-tight
