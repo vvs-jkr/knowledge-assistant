@@ -73,14 +73,14 @@ export function GenerateWorkoutDialog() {
         date: today,
         name: result.name,
         workout_type: result.workout_type,
-        duration_mins: result.duration_mins ?? undefined,
+        ...(result.duration_mins !== null ? { duration_mins: result.duration_mins } : {}),
         source_type: 'generated',
         exercises: result.exercises.map((ex, i) => ({
           name: ex.name,
-          sets: ex.sets ?? undefined,
-          reps: ex.reps ?? undefined,
-          weight_note: ex.weight_note ?? undefined,
           order_index: i,
+          ...(ex.sets !== null ? { sets: ex.sets } : {}),
+          ...(ex.reps !== null ? { reps: ex.reps } : {}),
+          ...(ex.weight_note !== null ? { weight_note: ex.weight_note } : {}),
         })),
       })
       await qc.invalidateQueries({ queryKey: ['workouts'] })
