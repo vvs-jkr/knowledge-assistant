@@ -7,20 +7,22 @@ use axum::{
 use sqlx::Row as _;
 
 use crate::{
-    config::AppState,
+    ai, config::AppState, crypto, embeddings,
     error::{ApiResult, AppError},
     middleware::AuthUser,
     workouts::{
         validate_date, validate_workout_type, CreateLogRequest, CreateWorkoutRequest, ExerciseInfo,
-        ExerciseInput, ExerciseProgress, ExercisesQuery, HeatmapEntry, LogsQuery, StatsQuery,
-        TypeDistribution, UpdateWorkoutRequest, VolumeEntry, WorkoutDetail, WorkoutExercise,
-        WorkoutLog, WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
+        ExerciseInput, ExerciseProgress, ExercisesQuery, GenerateWorkoutRequest,
+        GeneratedWorkoutResponse, HeatmapEntry, LogsQuery, StatsQuery, TypeDistribution,
+        UpdateWorkoutRequest, VolumeEntry, WorkoutDetail, WorkoutExercise, WorkoutLog,
+        WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
     },
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/workouts", get(list_workouts).post(create_workout))
+        .route("/workouts/generate", axum::routing::post(generate_workout))
         .route("/workouts/stats", get(get_stats))
         .route("/workouts/exercises", get(list_exercises))
         .route("/workouts/logs", get(list_logs).post(create_log))
@@ -776,6 +778,136 @@ async fn insert_exercises(
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// POST /workouts/generate
+// ---------------------------------------------------------------------------
+
+async fn generate_workout(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<GenerateWorkoutRequest>,
+) -> ApiResult<Json<GeneratedWorkoutResponse>> {
+    let prompt = body.prompt.trim().to_owned();
+    if prompt.is_empty() {
+        return Err(AppError::BadRequest("Prompt cannot be empty".into()));
+    }
+    if state.anthropic_api_key.is_empty() {
+        return Err(AppError::BadRequest(
+            "Workout generation is not configured (missing ANTHROPIC_API_KEY)".into(),
+        ));
+    }
+
+    // Build RAG context from knowledge base if Voyage is configured.
+    let (knowledge_context, knowledge_ids) =
+        build_rag_context(&state, &claims.sub, &prompt).await?;
+
+    let draft = ai::generate_workout(
+        &state.http_client,
+        &state.anthropic_api_key,
+        &state.anthropic_model,
+        &prompt,
+        &knowledge_context,
+    )
+    .await?;
+
+    // Persist the generated workout record.
+    let gen_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let result_json = serde_json::to_string(&draft)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize draft: {e}")))?;
+    let ids_json = serde_json::to_string(&knowledge_ids)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize knowledge_ids: {e}")))?;
+
+    sqlx::query(
+        "INSERT INTO generated_workouts (id, user_id, prompt, result, knowledge_ids, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&gen_id)
+    .bind(&claims.sub)
+    .bind(&prompt)
+    .bind(&result_json)
+    .bind(&ids_json)
+    .bind(&now)
+    .execute(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok(Json(GeneratedWorkoutResponse {
+        id: gen_id,
+        prompt,
+        result: draft,
+        knowledge_ids,
+        created_at: now,
+    }))
+}
+
+/// Fetch and decrypt the top-3 relevant knowledge entries as RAG context.
+///
+/// Returns `(context_string, knowledge_ids_used)`.
+/// Silently falls back to empty context if Voyage is not configured or no entries exist.
+async fn build_rag_context(
+    state: &AppState,
+    user_id: &str,
+    prompt: &str,
+) -> ApiResult<(String, Vec<String>)> {
+    if state.voyage_api_key.is_empty() {
+        return Ok((String::new(), Vec::new()));
+    }
+
+    let query_embedding = match embeddings::generate_embedding(
+        &state.http_client,
+        &state.voyage_api_key,
+        prompt,
+        "query",
+    )
+    .await
+    {
+        Ok(emb) => emb,
+        Err(e) => {
+            tracing::warn!("Failed to embed prompt for RAG: {e}");
+            return Ok((String::new(), Vec::new()));
+        }
+    };
+
+    let embedding_bytes = embeddings::embedding_to_bytes(&query_embedding);
+    let candidates = embeddings::search_knowledge_embeddings(&state.db, &embedding_bytes, 9)
+        .await
+        .unwrap_or_default();
+
+    let mut context_lines: Vec<String> = Vec::new();
+    let mut used_ids: Vec<String> = Vec::new();
+
+    for (knowledge_id, _distance) in candidates {
+        if used_ids.len() >= 3 {
+            break;
+        }
+
+        let row = sqlx::query(
+            "SELECT title, content_enc, nonce FROM knowledge_base WHERE id = ? AND user_id = ?",
+        )
+        .bind(&knowledge_id)
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+        let Some(row) = row else { continue };
+
+        let content_enc: Vec<u8> = row.try_get("content_enc").map_err(AppError::from)?;
+        let nonce: Vec<u8> = row.try_get("nonce").map_err(AppError::from)?;
+        let title: String = row.try_get("title").map_err(AppError::from)?;
+
+        if let Ok(bytes) = crypto::decrypt(&state.encryption_key, &content_enc, &nonce) {
+            let text = String::from_utf8_lossy(&bytes);
+            let preview: String = text.chars().take(400).collect();
+            context_lines.push(format!("## {title}\n{preview}"));
+            used_ids.push(knowledge_id);
+        }
+    }
+
+    Ok((context_lines.join("\n\n"), used_ids))
 }
 
 /// Compute the current streak in days ending at (or including) `today`.

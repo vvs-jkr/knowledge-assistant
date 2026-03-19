@@ -1,6 +1,7 @@
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { HealthPage } from '@/pages/health/HealthPage'
+import { KnowledgePage } from '@/pages/knowledge/KnowledgePage'
 import { NotesPage } from '@/pages/notes/NotesPage'
 import { WorkoutDetailPage } from '@/pages/workouts/WorkoutDetailPage'
 import { WorkoutsPage } from '@/pages/workouts/WorkoutsPage'
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
           { path: 'health', element: <HealthPage /> },
           { path: 'workouts', element: <WorkoutsPage /> },
           { path: 'workouts/:id', element: <WorkoutDetailPage /> },
+          { path: 'knowledge', element: <KnowledgePage /> },
         ],
       },
     ],

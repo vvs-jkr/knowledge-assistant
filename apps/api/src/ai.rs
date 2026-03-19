@@ -2,6 +2,38 @@ use crate::{
     error::{ApiResult, AppError},
     health::LabExtraction,
 };
+
+// ---------------------------------------------------------------------------
+// Workout generation types
+// ---------------------------------------------------------------------------
+
+/// A generated exercise within a workout draft.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DraftExercise {
+    /// Exercise name.
+    pub name: String,
+    /// Number of sets.
+    pub sets: Option<u32>,
+    /// Number of reps per set.
+    pub reps: Option<u32>,
+    /// Qualitative weight guidance (e.g. "moderate", "heavy").
+    pub weight_note: Option<String>,
+}
+
+/// A generated workout draft returned by the AI.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WorkoutDraft {
+    /// Workout name.
+    pub name: String,
+    /// One of the valid workout types (for_time, amrap, emom, tabata, lifting, rounds, other).
+    pub workout_type: String,
+    /// Estimated duration in minutes.
+    pub duration_mins: Option<u32>,
+    /// Optional coaching notes.
+    pub notes: Option<String>,
+    /// Exercise list.
+    pub exercises: Vec<DraftExercise>,
+}
 use serde::{Deserialize, Serialize};
 
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
@@ -352,6 +384,111 @@ fn extract_json_object(text: &str) -> &str {
     }
 
     inner
+}
+
+// ---------------------------------------------------------------------------
+// Workout generation
+// ---------------------------------------------------------------------------
+
+/// Asks Claude to generate a structured workout based on `prompt` and optional
+/// `knowledge_context` (RAG excerpts from the user's knowledge base).
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the API call or JSON parsing fails.
+pub async fn generate_workout(
+    http_client: &reqwest::Client,
+    anthropic_api_key: &str,
+    anthropic_model: &str,
+    prompt: &str,
+    knowledge_context: &str,
+) -> ApiResult<WorkoutDraft> {
+    let system = workout_generation_system_prompt();
+    let user_content = build_workout_generation_message(prompt, knowledge_context);
+
+    let request = AnthropicRequest {
+        model: anthropic_model,
+        max_tokens: 2048,
+        system: &system,
+        messages: vec![AnthropicMessage {
+            role: "user",
+            content: &user_content,
+        }],
+    };
+
+    let response = http_client
+        .post(ANTHROPIC_API_URL)
+        .header("x-api-key", anthropic_api_key)
+        .header("anthropic-version", ANTHROPIC_VERSION)
+        .header("content-type", "application/json")
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic API request failed: {e}")))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "Anthropic API error {status}: {body}"
+        )));
+    }
+
+    let api_resp: AnthropicResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic API parse error: {e}")))?;
+
+    let text = api_resp
+        .content
+        .iter()
+        .find(|b| b.block_type == "text")
+        .and_then(|b| b.text.as_deref())
+        .ok_or_else(|| {
+            AppError::Internal(anyhow::anyhow!("No text block in Anthropic response"))
+        })?;
+
+    serde_json::from_str::<WorkoutDraft>(extract_json_object(text))
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to parse workout draft JSON: {e}")))
+}
+
+fn workout_generation_system_prompt() -> String {
+    r#"You are an expert fitness coach. Generate a workout based on the user's request.
+
+Return ONLY valid JSON — no markdown fences, no extra text — with exactly this structure:
+{
+  "name": "Workout Name",
+  "workout_type": "lifting",
+  "duration_mins": 60,
+  "notes": "Optional coaching notes",
+  "exercises": [
+    {
+      "name": "Exercise Name",
+      "sets": 4,
+      "reps": 10,
+      "weight_note": "moderate weight"
+    }
+  ]
+}
+
+Rules:
+- workout_type: one of "for_time", "amrap", "emom", "tabata", "lifting", "rounds", "other"
+- duration_mins: integer or null
+- notes: brief coaching notes or null
+- exercises: at least 3, ordered logically (warm-up to cool-down)
+- sets/reps: integers or null if not applicable (e.g. cardio)
+- weight_note: qualitative guidance or null"#
+        .into()
+}
+
+fn build_workout_generation_message(prompt: &str, knowledge_context: &str) -> String {
+    if knowledge_context.is_empty() {
+        prompt.to_owned()
+    } else {
+        format!(
+            "{prompt}\n\n---\nRelevant knowledge base excerpts:\n{knowledge_context}"
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------

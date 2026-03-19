@@ -32,12 +32,21 @@ pub async fn init(database_url: &str) -> anyhow::Result<sqlx::SqlitePool> {
     let pool = sqlx::SqlitePool::connect_with(options).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
 
-    // Create the sqlite-vec virtual table. This cannot be in a migration file
+    // Create sqlite-vec virtual tables. These cannot be in migration files
     // because `sqlx migrate run` (CLI) does not load the sqlite-vec extension.
     // The extension IS loaded above via register_extensions(), so this is safe.
     sqlx::query(
         "CREATE VIRTUAL TABLE IF NOT EXISTS note_embeddings USING vec0(
              note_id TEXT PRIMARY KEY,
+             embedding float[512]
+         )",
+    )
+    .execute(&pool)
+    .await?;
+
+    sqlx::query(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_embeddings USING vec0(
+             knowledge_id TEXT PRIMARY KEY,
              embedding float[512]
          )",
     )

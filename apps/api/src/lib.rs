@@ -6,6 +6,7 @@ pub mod db;
 pub mod embeddings;
 pub mod error;
 pub mod health;
+pub mod knowledge;
 pub mod middleware;
 pub mod notes;
 pub mod routes;
@@ -21,6 +22,7 @@ pub fn build_app(state: config::AppState) -> Router {
         .merge(routes::notes::router())
         .merge(routes::health::router())
         .merge(routes::workouts::router())
+        .merge(routes::knowledge::router())
         .layer(
             CorsLayer::new()
                 .allow_origin(

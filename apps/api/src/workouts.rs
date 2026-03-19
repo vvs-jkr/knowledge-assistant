@@ -227,6 +227,28 @@ pub struct LogsQuery {
     pub limit: Option<i64>,
 }
 
+/// Request body for `POST /workouts/generate`.
+#[derive(Debug, Deserialize)]
+pub struct GenerateWorkoutRequest {
+    /// Natural-language description of the desired workout.
+    pub prompt: String,
+}
+
+/// Response from `POST /workouts/generate`.
+#[derive(Debug, Serialize)]
+pub struct GeneratedWorkoutResponse {
+    /// Generated record ID (saved in `generated_workouts`).
+    pub id: String,
+    /// Original user prompt.
+    pub prompt: String,
+    /// Structured workout draft from Claude.
+    pub result: crate::ai::WorkoutDraft,
+    /// IDs of knowledge entries used as RAG context.
+    pub knowledge_ids: Vec<String>,
+    /// UTC timestamp of generation.
+    pub created_at: String,
+}
+
 // ---------------------------------------------------------------------------
 // Validation helpers
 // ---------------------------------------------------------------------------

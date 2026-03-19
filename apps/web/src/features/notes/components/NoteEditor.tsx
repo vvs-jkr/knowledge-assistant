@@ -4,7 +4,7 @@ import { useNote, useUpdateNote } from '@/features/notes/api/notes.api'
 import { MarkdownEditor } from '@/features/notes/components/MarkdownEditor'
 import { useNotesStore } from '@/features/notes/store/notes.store'
 import type { NoteWithContent } from '@/shared/schemas/notes.schema'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 interface NoteEditorFormProps {
@@ -28,6 +28,24 @@ function NoteEditorForm({ note, onCancel }: NoteEditorFormProps) {
       }
     )
   }
+
+  // Keep a stable ref so the keydown handler always calls the latest handleSave
+  const handleSaveRef = useRef(handleSave)
+  handleSaveRef.current = handleSave
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleSaveRef.current()
+      }
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onCancel])
 
   return (
     <div className="flex h-full flex-col">

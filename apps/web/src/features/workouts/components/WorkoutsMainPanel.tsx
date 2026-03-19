@@ -1,3 +1,4 @@
+import { GenerateWorkoutDialog } from '@/features/workouts/components/GenerateWorkoutDialog'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
 import { StatsPanel } from './StatsPanel'
 import { WorkoutDetailPanel } from './WorkoutDetailPanel'
@@ -12,29 +13,32 @@ export function WorkoutsMainPanel() {
   return (
     <div className="flex h-full w-full flex-col">
       {/* Tab bar */}
-      <div className="flex shrink-0 border-b">
-        <button
-          type="button"
-          onClick={() => setActiveTab('list')}
-          className={`px-6 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'list'
-              ? 'border-b-2 border-foreground text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Workouts
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('stats')}
-          className={`px-6 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'stats'
-              ? 'border-b-2 border-foreground text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Stats
-        </button>
+      <div className="flex shrink-0 items-center justify-between border-b pr-4">
+        <div className="flex">
+          <button
+            type="button"
+            onClick={() => setActiveTab('list')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'list'
+                ? 'border-b-2 border-foreground text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Workouts
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('stats')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'stats'
+                ? 'border-b-2 border-foreground text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Stats
+          </button>
+        </div>
+        <GenerateWorkoutDialog />
       </div>
 
       {/* Tab content */}

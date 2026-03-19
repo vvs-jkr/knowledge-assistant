@@ -2,6 +2,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSearchNotes } from '@/features/notes/api/notes.api'
 import { useNotesStore } from '@/features/notes/store/notes.store'
+import { isInputFocused } from '@/shared/lib/keyboard'
 import type { SearchResult } from '@/shared/schemas/notes.schema'
 import { Search, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -13,6 +14,19 @@ export function NoteSearch() {
   const setIsSearching = useNotesStore((s) => s.setIsSearching)
   const clearSearch = useNotesStore((s) => s.clearSearch)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // / → focus this search input
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === '/' && !isInputFocused()) {
+        e.preventDefault()
+        inputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const handleSearch = useCallback(
     (query: string) => {
@@ -50,6 +64,7 @@ export function NoteSearch() {
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
+          ref={inputRef}
           type="search"
           placeholder="Semantic search…"
           value={localQuery}

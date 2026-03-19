@@ -114,6 +114,68 @@ pub async fn delete_embedding(db: &sqlx::SqlitePool, note_id: &str) -> ApiResult
     Ok(())
 }
 
+/// Stores or replaces the embedding for `knowledge_id` in the knowledge vec0 virtual table.
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the database operation fails.
+pub async fn upsert_knowledge_embedding(
+    db: &sqlx::SqlitePool,
+    knowledge_id: &str,
+    embedding: &[f32],
+) -> ApiResult<()> {
+    let bytes = embedding_to_bytes(embedding);
+    sqlx::query(
+        "INSERT OR REPLACE INTO knowledge_embeddings(knowledge_id, embedding) VALUES (?, ?)",
+    )
+    .bind(knowledge_id)
+    .bind(&bytes)
+    .execute(db)
+    .await
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("knowledge embedding upsert: {e}")))?;
+    Ok(())
+}
+
+/// Deletes the embedding for `knowledge_id` from the knowledge vec0 virtual table.
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the database operation fails.
+pub async fn delete_knowledge_embedding(
+    db: &sqlx::SqlitePool,
+    knowledge_id: &str,
+) -> ApiResult<()> {
+    sqlx::query("DELETE FROM knowledge_embeddings WHERE knowledge_id = ?")
+        .bind(knowledge_id)
+        .execute(db)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("knowledge embedding delete: {e}")))?;
+    Ok(())
+}
+
+/// Searches `knowledge_embeddings` for the `limit` nearest neighbours of `embedding_bytes`.
+///
+/// Returns `(knowledge_id, distance)` pairs ordered by ascending distance.
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the vector search fails.
+pub async fn search_knowledge_embeddings(
+    db: &sqlx::SqlitePool,
+    embedding_bytes: &[u8],
+    limit: i64,
+) -> ApiResult<Vec<(String, f64)>> {
+    sqlx::query_as(
+        "SELECT knowledge_id, distance FROM knowledge_embeddings \
+         WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
+    )
+    .bind(embedding_bytes)
+    .bind(limit)
+    .fetch_all(db)
+    .await
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("knowledge vector search: {e}")))
+}
+
 /// Serializes an f32 slice to little-endian bytes as expected by sqlite-vec.
 pub fn embedding_to_bytes(embedding: &[f32]) -> Vec<u8> {
     embedding.iter().flat_map(|f| f.to_le_bytes()).collect()

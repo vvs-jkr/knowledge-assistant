@@ -1,12 +1,13 @@
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Activity, ChevronLeft, ChevronRight, FileText, Heart } from 'lucide-react'
+import { Activity, BookOpen, ChevronLeft, ChevronRight, FileText, Heart } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 const NAV_LINKS = [
   { to: '/notes', label: 'Notes', icon: FileText },
   { to: '/health', label: 'Health', icon: Heart },
   { to: '/workouts', label: 'Workouts', icon: Activity },
+  { to: '/knowledge', label: 'Knowledge', icon: BookOpen },
 ]
 
 interface AppSidebarProps {

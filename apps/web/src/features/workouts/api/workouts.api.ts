@@ -17,6 +17,32 @@ import {
 } from '@/shared/schemas/workouts.schema'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+type ExerciseInput = {
+  exercise_id?: string
+  name?: string
+  muscle_groups?: string[]
+  reps?: number
+  sets?: number
+  weight_kg?: number
+  weight_note?: string
+  duration_secs?: number
+  order_index?: number
+  notes?: string
+}
+
+type CreateWorkoutInput = {
+  date: string
+  name: string
+  workout_type?: string
+  duration_mins?: number
+  rounds?: number
+  source_type?: string
+  source_file?: string
+  raw_text?: string
+  year_confidence?: number
+  exercises?: ExerciseInput[]
+}
+
 type WorkoutsQuery = Partial<
   Pick<WorkoutSummary, 'workout_type'> & {
     from: string
@@ -63,6 +89,11 @@ const workoutsApi = {
       .then((r) => {
         return exerciseInfoSchema.array().parse(r.data)
       }),
+
+  create: (body: CreateWorkoutInput): Promise<WorkoutSummary> =>
+    api.post<WorkoutSummary>('/workouts', body).then((r) => {
+      return workoutSummarySchema.parse(r.data)
+    }),
 
   createLog: (body: CreateWorkoutLog): Promise<WorkoutLog> =>
     api.post<WorkoutLog>('/workouts/logs', body).then((r) => {
