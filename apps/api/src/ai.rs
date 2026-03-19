@@ -191,6 +191,7 @@ fn system_prompt() -> String {
 }
 
 Rules:
+- Always respond in Russian language
 - quality_score: integer 1-10 (structure, completeness, clarity)
 - improvement_suggestions: actionable, specific; empty array if none needed
 - duplicate_candidates: only include notes with genuinely overlapping content; empty array if none
@@ -396,7 +397,8 @@ Rules:
 - notes: brief coaching notes or null
 - exercises: at least 3, ordered logically (warm-up to cool-down)
 - sets/reps: integers or null if not applicable (e.g. cardio)
-- weight_note: qualitative guidance or null"#
+- weight_note: qualitative guidance or null
+- Always respond in Russian language (name, notes, weight_note fields)"#
         .into()
 }
 
