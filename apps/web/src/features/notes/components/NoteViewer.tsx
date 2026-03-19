@@ -57,7 +57,7 @@ export function NoteViewer() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full w-full flex-col">
       <div className="flex shrink-0 items-center justify-between border-b px-6 py-3">
         <h2 className="truncate text-lg font-semibold">{note.filename}</h2>
         <div className="flex shrink-0 items-center gap-1">
