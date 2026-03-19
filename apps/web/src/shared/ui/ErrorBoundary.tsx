@@ -9,17 +9,17 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null }
+  override state: State = { error: null }
 
   static getDerivedStateFromError(error: Error): State {
     return { error }
   }
 
-  componentDidCatch(_error: Error, _info: ErrorInfo) {
+  override componentDidCatch(_error: Error, _info: ErrorInfo) {
     // errors are surfaced in the fallback UI and React DevTools
   }
 
-  render() {
+  override render() {
     if (this.state.error) {
       return (
         <div className="flex h-screen items-center justify-center p-4">
