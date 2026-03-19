@@ -2,6 +2,7 @@ use crate::{
     error::{ApiResult, AppError},
     health::LabExtraction,
 };
+use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
 // Workout generation types
@@ -34,10 +35,8 @@ pub struct WorkoutDraft {
     /// Exercise list.
     pub exercises: Vec<DraftExercise>,
 }
-use serde::{Deserialize, Serialize};
 
-const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_VERSION: &str = "2023-06-01";
+const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -47,7 +46,7 @@ const ANTHROPIC_VERSION: &str = "2023-06-01";
 pub struct NoteAnalysis {
     pub summary: String,
     /// Subjective quality score from 1 (poor) to 10 (excellent).
-    /// Stored as f64 to tolerate Claude returning `8.0` instead of `8`.
+    /// Stored as f64 to tolerate the model returning `8.0` instead of `8`.
     #[serde(deserialize_with = "deserialize_score")]
     pub quality_score: u8,
     pub improvement_suggestions: Vec<String>,
@@ -73,65 +72,83 @@ pub struct DuplicateCandidate {
 }
 
 // ---------------------------------------------------------------------------
-// Anthropic API request/response shapes — text messages
-// ---------------------------------------------------------------------------
-
-#[derive(Serialize)]
-struct AnthropicRequest<'a> {
-    model: &'a str,
-    max_tokens: u32,
-    system: &'a str,
-    messages: Vec<AnthropicMessage<'a>>,
-}
-
-#[derive(Serialize)]
-struct AnthropicMessage<'a> {
-    role: &'a str,
-    content: &'a str,
-}
-
-// ---------------------------------------------------------------------------
-// Anthropic API request/response shapes — PDF document messages
-// ---------------------------------------------------------------------------
-
-#[derive(Serialize)]
-struct PdfAnthropicRequest<'a> {
-    model: &'a str,
-    max_tokens: u32,
-    system: &'a str,
-    messages: Vec<PdfMessage>,
-}
-
-#[derive(Serialize)]
-struct PdfMessage {
-    role: String,
-    content: Vec<serde_json::Value>,
-}
-
-// ---------------------------------------------------------------------------
-// Shared response shape
+// OpenAI-compatible request/response shapes (used by OpenRouter)
 // ---------------------------------------------------------------------------
 
 #[derive(Deserialize)]
-struct AnthropicResponse {
-    content: Vec<ContentBlock>,
+struct OaiResponse {
+    choices: Vec<OaiChoice>,
 }
 
 #[derive(Deserialize)]
-struct ContentBlock {
-    #[serde(rename = "type")]
-    block_type: String,
-    text: Option<String>,
+struct OaiChoice {
+    message: OaiAssistantMessage,
+}
+
+#[derive(Deserialize)]
+struct OaiAssistantMessage {
+    content: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Shared HTTP helper
+// ---------------------------------------------------------------------------
+
+async fn call_openrouter(
+    http_client: &reqwest::Client,
+    api_key: &str,
+    model: &str,
+    system: &str,
+    user_content: serde_json::Value,
+    max_tokens: u32,
+) -> ApiResult<String> {
+    let body = serde_json::json!({
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ]
+    });
+
+    let response = http_client
+        .post(OPENROUTER_API_URL)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("OpenRouter request failed: {e}")))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "OpenRouter API error {status}: {text}"
+        )));
+    }
+
+    let api_resp: OaiResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("OpenRouter parse error: {e}")))?;
+
+    api_resp
+        .choices
+        .into_iter()
+        .next()
+        .and_then(|c| c.message.content)
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("No content in OpenRouter response")))
 }
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Sends `note_content` to Claude for analysis.
+/// Sends `note_content` to the AI for analysis.
 ///
 /// `other_notes_context` should be a plain-text summary of other notes in the
-/// knowledge base so Claude can check for duplicates.
+/// knowledge base so the model can check for duplicates.
 pub async fn analyze_note(
     http_client: &reqwest::Client,
     anthropic_api_key: &str,
@@ -143,49 +160,17 @@ pub async fn analyze_note(
     let system = system_prompt();
     let user_content = build_user_message(note_content, note_filename, other_notes_context);
 
-    let request = AnthropicRequest {
-        model: anthropic_model,
-        max_tokens: 2048,
-        system: &system,
-        messages: vec![AnthropicMessage {
-            role: "user",
-            content: &user_content,
-        }],
-    };
+    let text = call_openrouter(
+        http_client,
+        anthropic_api_key,
+        anthropic_model,
+        &system,
+        serde_json::Value::String(user_content),
+        2048,
+    )
+    .await?;
 
-    let response = http_client
-        .post(ANTHROPIC_API_URL)
-        .header("x-api-key", anthropic_api_key)
-        .header("anthropic-version", ANTHROPIC_VERSION)
-        .header("content-type", "application/json")
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic API request failed: {e}")))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(AppError::Internal(anyhow::anyhow!(
-            "Anthropic API error {status}: {body}"
-        )));
-    }
-
-    let api_resp: AnthropicResponse = response
-        .json()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic API parse error: {e}")))?;
-
-    let text = api_resp
-        .content
-        .iter()
-        .find(|b| b.block_type == "text")
-        .and_then(|b| b.text.as_deref())
-        .ok_or_else(|| {
-            AppError::Internal(anyhow::anyhow!("No text block in Anthropic response"))
-        })?;
-
-    serde_json::from_str::<NoteAnalysis>(extract_json_object(text))
+    serde_json::from_str::<NoteAnalysis>(extract_json_object(&text))
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to parse analysis JSON: {e}")))
 }
 
@@ -227,7 +212,7 @@ fn build_user_message(content: &str, filename: &str, other_notes_context: &str) 
 // Health lab extraction (PDF → structured metrics)
 // ---------------------------------------------------------------------------
 
-/// Sends a base64-encoded PDF to Claude and returns extracted lab metrics.
+/// Sends a base64-encoded PDF to the AI and returns extracted lab metrics.
 ///
 /// The `pdf_base64` argument must be standard base64 (no line breaks).
 pub async fn extract_lab_metrics(
@@ -238,67 +223,33 @@ pub async fn extract_lab_metrics(
     pdf_filename: &str,
 ) -> ApiResult<LabExtraction> {
     let system = lab_system_prompt();
-    let content = vec![
-        serde_json::json!({
-            "type": "document",
-            "source": {
-                "type": "base64",
-                "media_type": "application/pdf",
-                "data": pdf_base64
+
+    // OpenRouter file attachment format (supported by Claude and other vision models).
+    let user_content = serde_json::json!([
+        {
+            "type": "file",
+            "file": {
+                "filename": pdf_filename,
+                "file_data": format!("data:application/pdf;base64,{pdf_base64}")
             }
-        }),
-        serde_json::json!({
+        },
+        {
             "type": "text",
-            "text": format!(
-                "Filename: {pdf_filename}\n\nExtract all lab metrics from this document."
-            )
-        }),
-    ];
+            "text": format!("Filename: {pdf_filename}\n\nExtract all lab metrics from this document.")
+        }
+    ]);
 
-    let request = PdfAnthropicRequest {
-        model: anthropic_model,
-        max_tokens: 4096,
-        system: &system,
-        messages: vec![PdfMessage {
-            role: "user".into(),
-            content,
-        }],
-    };
+    let text = call_openrouter(
+        http_client,
+        anthropic_api_key,
+        anthropic_model,
+        &system,
+        user_content,
+        4096,
+    )
+    .await?;
 
-    let response = http_client
-        .post(ANTHROPIC_API_URL)
-        .header("x-api-key", anthropic_api_key)
-        .header("anthropic-version", ANTHROPIC_VERSION)
-        .header("anthropic-beta", "pdfs-2024-09-25")
-        .header("content-type", "application/json")
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic PDF request failed: {e}")))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(AppError::Internal(anyhow::anyhow!(
-            "Anthropic API error {status}: {body}"
-        )));
-    }
-
-    let api_resp: AnthropicResponse = response
-        .json()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic PDF parse error: {e}")))?;
-
-    let text = api_resp
-        .content
-        .iter()
-        .find(|b| b.block_type == "text")
-        .and_then(|b| b.text.as_deref())
-        .ok_or_else(|| {
-            AppError::Internal(anyhow::anyhow!("No text block in Anthropic PDF response"))
-        })?;
-
-    serde_json::from_str::<LabExtraction>(extract_json_object(text)).map_err(|e| {
+    serde_json::from_str::<LabExtraction>(extract_json_object(&text)).map_err(|e| {
         AppError::Internal(anyhow::anyhow!("Failed to parse lab extraction JSON: {e}"))
     })
 }
@@ -353,8 +304,8 @@ Rules:
 
 /// Extracts the outermost JSON object `{...}` from an LLM response string.
 ///
-/// Claude sometimes wraps the JSON in markdown code fences (` ```json...``` `)
-/// or adds preamble text. This function strips fences and finds the JSON boundaries.
+/// Models sometimes wrap the JSON in markdown code fences (` ```json...``` `)
+/// or add preamble text. This function strips fences and finds the JSON boundaries.
 fn extract_json_object(text: &str) -> &str {
     // First strip any markdown code fences.
     let text = text.trim();
@@ -390,7 +341,7 @@ fn extract_json_object(text: &str) -> &str {
 // Workout generation
 // ---------------------------------------------------------------------------
 
-/// Asks Claude to generate a structured workout based on `prompt` and optional
+/// Asks the AI to generate a structured workout based on `prompt` and optional
 /// `knowledge_context` (RAG excerpts from the user's knowledge base).
 ///
 /// # Errors
@@ -406,49 +357,17 @@ pub async fn generate_workout(
     let system = workout_generation_system_prompt();
     let user_content = build_workout_generation_message(prompt, knowledge_context);
 
-    let request = AnthropicRequest {
-        model: anthropic_model,
-        max_tokens: 2048,
-        system: &system,
-        messages: vec![AnthropicMessage {
-            role: "user",
-            content: &user_content,
-        }],
-    };
+    let text = call_openrouter(
+        http_client,
+        anthropic_api_key,
+        anthropic_model,
+        &system,
+        serde_json::Value::String(user_content),
+        2048,
+    )
+    .await?;
 
-    let response = http_client
-        .post(ANTHROPIC_API_URL)
-        .header("x-api-key", anthropic_api_key)
-        .header("anthropic-version", ANTHROPIC_VERSION)
-        .header("content-type", "application/json")
-        .json(&request)
-        .send()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic API request failed: {e}")))?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(AppError::Internal(anyhow::anyhow!(
-            "Anthropic API error {status}: {body}"
-        )));
-    }
-
-    let api_resp: AnthropicResponse = response
-        .json()
-        .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Anthropic API parse error: {e}")))?;
-
-    let text = api_resp
-        .content
-        .iter()
-        .find(|b| b.block_type == "text")
-        .and_then(|b| b.text.as_deref())
-        .ok_or_else(|| {
-            AppError::Internal(anyhow::anyhow!("No text block in Anthropic response"))
-        })?;
-
-    serde_json::from_str::<WorkoutDraft>(extract_json_object(text))
+    serde_json::from_str::<WorkoutDraft>(extract_json_object(&text))
         .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to parse workout draft JSON: {e}")))
 }
 
