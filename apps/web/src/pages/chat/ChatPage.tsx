@@ -1,18 +1,19 @@
 import { useChatSessions } from '@/features/chat/api/chat.api'
 import { ChatSessionList } from '@/features/chat/components/ChatSessionList'
 import { ChatWindow } from '@/features/chat/components/ChatWindow'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export function ChatPage() {
   const { data: sessions = [] } = useChatSessions()
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
 
-  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
-
-  // If active session was deleted, reset.
-  if (activeSessionId !== null && activeSession === null && sessions.length > 0) {
-    setActiveSessionId(sessions[0].id)
-  }
+  useEffect(() => {
+    if (activeSessionId === null) return
+    const stillExists = sessions.some((s) => s.id === activeSessionId)
+    if (!stillExists) {
+      setActiveSessionId(sessions[0]?.id ?? null)
+    }
+  }, [sessions, activeSessionId])
 
   return (
     <div className="flex h-full w-full overflow-hidden">
