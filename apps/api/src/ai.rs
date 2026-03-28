@@ -1,6 +1,7 @@
 use crate::{
     error::{ApiResult, AppError},
     health::LabExtraction,
+    workouts::WorkoutAnalysis,
 };
 use serde::{Deserialize, Serialize};
 
@@ -179,7 +180,7 @@ pub async fn analyze_note(
 // ---------------------------------------------------------------------------
 
 fn system_prompt() -> String {
-    r#"You are a knowledge base analyst. Analyze the provided note and return ONLY valid JSON — no markdown fences, no extra text — with exactly this structure:
+    r#"You are a knowledge base analyst. Analyze the provided note and return ONLY valid JSON -- no markdown fences, no extra text -- with exactly this structure:
 {
   "summary": "2-3 sentence summary",
   "quality_score": 7,
@@ -210,7 +211,7 @@ fn build_user_message(content: &str, filename: &str, other_notes_context: &str) 
 }
 
 // ---------------------------------------------------------------------------
-// Health lab extraction (PDF → structured metrics)
+// Health lab extraction (PDF -> structured metrics)
 // ---------------------------------------------------------------------------
 
 /// Sends a base64-encoded PDF to the AI and returns extracted lab metrics.
@@ -258,7 +259,7 @@ pub async fn extract_lab_metrics(
 fn lab_system_prompt() -> String {
     r#"You are a medical lab report analyzer. Extract lab metrics from the provided PDF document.
 
-Return ONLY valid JSON — no markdown fences, no extra text — with exactly this structure:
+Return ONLY valid JSON -- no markdown fences, no extra text -- with exactly this structure:
 {
   "lab_date": "YYYY-MM-DD",
   "lab_name": "Laboratory Name",
@@ -274,15 +275,15 @@ Return ONLY valid JSON — no markdown fences, no extra text — with exactly th
   ]
 }
 
-Canonical metric names (ONLY use these — omit any metric not in this list):
+Canonical metric names (ONLY use these -- omit any metric not in this list):
 - glucose (blood glucose, mmol/L)
 - cholesterol_total (total cholesterol, mmol/L)
 - cholesterol_hdl (HDL cholesterol, mmol/L)
 - cholesterol_ldl (LDL cholesterol, mmol/L)
 - hemoglobin (hemoglobin, g/L)
-- platelets (platelets/thrombocytes, ×10⁹/L)
-- leukocytes (white blood cells, ×10⁹/L)
-- erythrocytes (red blood cells, ×10¹²/L)
+- platelets (platelets/thrombocytes, x10⁹/L)
+- leukocytes (white blood cells, x10⁹/L)
+- erythrocytes (red blood cells, x10¹²/L)
 - esr (erythrocyte sedimentation rate, mm/h)
 - creatinine (creatinine, μmol/L)
 - alt (alanine aminotransferase, U/L)
@@ -368,9 +369,9 @@ fn improve_system_prompt() -> String {
 - Fix grammar, spelling, and style
 - Improve structure with proper headings, lists, and formatting
 - Make it clearer and more concise
-- Preserve all original information — do not invent or omit facts
+- Preserve all original information -- do not invent or omit facts
 - Keep existing YAML frontmatter intact (do not remove or modify it)
-- Return ONLY the improved Markdown content — no explanations, no code fences
+- Return ONLY the improved Markdown content -- no explanations, no code fences
 Respond in the same language as the original note."#
         .into()
 }
@@ -412,7 +413,7 @@ pub async fn generate_workout(
 fn workout_generation_system_prompt() -> String {
     r#"You are an expert fitness coach. Generate a workout based on the user's request.
 
-Return ONLY valid JSON — no markdown fences, no extra text — with exactly this structure:
+Return ONLY valid JSON -- no markdown fences, no extra text -- with exactly this structure:
 {
   "name": "Workout Name",
   "workout_type": "lifting",
@@ -447,6 +448,69 @@ fn build_workout_generation_message(prompt: &str, knowledge_context: &str) -> St
             "{prompt}\n\n---\nRelevant knowledge base excerpts:\n{knowledge_context}"
         )
     }
+}
+
+// ---------------------------------------------------------------------------
+// Workout analysis
+// ---------------------------------------------------------------------------
+
+/// Analyses the user's workout history and returns structured coaching insights.
+///
+/// `stats_context` is a compact text summary of aggregated stats.
+/// `workouts_context` is a compact list of recent workouts with exercises.
+/// `health_context` is optional InBody / lab data (empty string if unavailable).
+pub async fn analyze_workouts(
+    http_client: &reqwest::Client,
+    api_key: &str,
+    model: &str,
+    stats_context: &str,
+    workouts_context: &str,
+    health_context: &str,
+) -> ApiResult<WorkoutAnalysis> {
+    let user_message = build_workout_analysis_message(stats_context, workouts_context, health_context);
+
+    let text = call_openrouter(
+        http_client,
+        api_key,
+        model,
+        &workout_analysis_system_prompt(),
+        serde_json::Value::String(user_message),
+        2048,
+    )
+    .await?;
+
+    serde_json::from_str::<WorkoutAnalysis>(extract_json_object(&text))
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to parse workout analysis JSON: {e}")))
+}
+
+fn workout_analysis_system_prompt() -> String {
+    r#"You are a personal fitness coach and health analyst. The user will provide their workout history statistics and recent training sessions. Analyze their training and return ONLY valid JSON -- no markdown fences, no extra text -- with exactly this structure:
+{
+  "summary": "3-4 sentence overall assessment of the training history",
+  "patterns": ["pattern 1", "pattern 2", "pattern 3"],
+  "muscle_balance": "Assessment of muscle group balance -- what's overdeveloped, underdeveloped, or well balanced",
+  "strengths": ["strength 1", "strength 2"],
+  "improvements": ["recommendation 1", "recommendation 2", "recommendation 3"],
+  "suggested_focus": "cardio"
+}
+
+Rules:
+- summary: holistic overview of consistency, volume, variety
+- patterns: 3-5 recurring patterns (e.g. training frequency, favourite exercises, weekly rhythm)
+- muscle_balance: 2-3 sentences on push/pull/legs/core balance based on exercise names
+- strengths: 2-4 things the athlete does well
+- improvements: 3-5 concrete, actionable recommendations
+- suggested_focus: one of "cardio", "mass", "strength", "mixed" -- based on history and gaps
+- All text fields must be in Russian language"#
+        .into()
+}
+
+fn build_workout_analysis_message(stats: &str, workouts: &str, health: &str) -> String {
+    let mut msg = format!("## Workout Statistics\n{stats}\n\n## Recent Workouts (last 50)\n{workouts}");
+    if !health.is_empty() {
+        msg.push_str(&format!("\n\n## Body Composition (InBody / Lab)\n{health}"));
+    }
+    msg
 }
 
 // ---------------------------------------------------------------------------

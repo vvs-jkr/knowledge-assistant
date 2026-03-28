@@ -106,6 +106,16 @@ export const createWorkoutLogSchema = z.object({
   notes: z.string().optional(),
 })
 
+export const workoutAnalysisSchema = z.object({
+  summary: z.string(),
+  patterns: z.array(z.string()),
+  muscle_balance: z.string(),
+  strengths: z.array(z.string()),
+  improvements: z.array(z.string()),
+  suggested_focus: z.string(),
+})
+
+export type WorkoutAnalysis = z.infer<typeof workoutAnalysisSchema>
 export type WorkoutType = z.infer<typeof workoutTypeSchema>
 export type WorkoutSummary = z.infer<typeof workoutSummarySchema>
 export type WorkoutDetail = z.infer<typeof workoutDetailSchema>

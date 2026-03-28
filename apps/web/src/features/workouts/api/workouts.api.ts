@@ -2,6 +2,7 @@ import { api } from '@/shared/lib/api'
 import type {
   CreateWorkoutLog,
   ExerciseInfo,
+  WorkoutAnalysis,
   WorkoutDetail,
   WorkoutLog,
   WorkoutStats,
@@ -10,6 +11,7 @@ import type {
 } from '@/shared/schemas/workouts.schema'
 import {
   exerciseInfoSchema,
+  workoutAnalysisSchema,
   workoutDetailSchema,
   workoutLogSchema,
   workoutStatsSchema,
@@ -104,6 +106,11 @@ const workoutsApi = {
     api.get<WorkoutLog[]>('/workouts/logs', { params }).then((r) => {
       return workoutLogSchema.array().parse(r.data)
     }),
+
+  analyze: (): Promise<WorkoutAnalysis> =>
+    api.post<WorkoutAnalysis>('/workouts/analyze').then((r) => {
+      return workoutAnalysisSchema.parse(r.data)
+    }),
 }
 
 export function useWorkouts(params?: WorkoutsQuery) {
@@ -157,5 +164,11 @@ export function useCreateWorkoutLog() {
   })
 }
 
+export function useAnalyzeWorkouts() {
+  return useMutation({
+    mutationFn: workoutsApi.analyze,
+  })
+}
+
 export { workoutsApi }
-export type { WorkoutsQuery, WorkoutType }
+export type { WorkoutsQuery, WorkoutType, WorkoutAnalysis }

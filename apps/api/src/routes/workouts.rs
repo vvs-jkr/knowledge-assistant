@@ -14,8 +14,8 @@ use crate::{
         validate_date, validate_workout_type, CreateLogRequest, CreateWorkoutRequest, ExerciseInfo,
         ExerciseInput, ExerciseProgress, ExercisesQuery, GenerateWorkoutRequest,
         GeneratedWorkoutResponse, HeatmapEntry, LogsQuery, StatsQuery, TypeDistribution,
-        UpdateWorkoutRequest, VolumeEntry, WorkoutDetail, WorkoutExercise, WorkoutLog,
-        WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
+        UpdateWorkoutRequest, VolumeEntry, WorkoutAnalysis, WorkoutDetail, WorkoutExercise,
+        WorkoutLog, WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
     },
 };
 
@@ -23,6 +23,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/workouts", get(list_workouts).post(create_workout))
         .route("/workouts/generate", axum::routing::post(generate_workout))
+        .route("/workouts/analyze", axum::routing::post(analyze_workouts_handler))
         .route("/workouts/stats", get(get_stats))
         .route("/workouts/exercises", get(list_exercises))
         .route("/workouts/logs", get(list_logs).post(create_log))
@@ -908,6 +909,156 @@ async fn build_rag_context(
     }
 
     Ok((context_lines.join("\n\n"), used_ids))
+}
+
+// ---------------------------------------------------------------------------
+// POST /workouts/analyze
+// ---------------------------------------------------------------------------
+
+async fn analyze_workouts_handler(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+) -> ApiResult<Json<WorkoutAnalysis>> {
+    if state.anthropic_api_key.is_empty() {
+        return Err(AppError::BadRequest(
+            "Workout analysis is not configured (missing ANTHROPIC_API_KEY)".into(),
+        ));
+    }
+
+    let user_id = &claims.sub;
+
+    // --- Aggregated stats ---
+    let total_workouts: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM workouts WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await
+            .map_err(AppError::from)?;
+
+    let type_rows = sqlx::query(
+        "SELECT workout_type, COUNT(*) AS cnt FROM workouts \
+         WHERE user_id = ? GROUP BY workout_type ORDER BY cnt DESC",
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let mut type_lines = Vec::new();
+    for row in &type_rows {
+        let wtype: String = row.try_get("workout_type").map_err(AppError::from)?;
+        let cnt: i64 = row.try_get("cnt").map_err(AppError::from)?;
+        type_lines.push(format!("  {wtype}: {cnt}"));
+    }
+
+    let stats_context = format!(
+        "Total workouts: {total_workouts}\nWorkout type distribution:\n{}",
+        type_lines.join("\n")
+    );
+
+    // --- Last 50 workouts with exercises (compact text) ---
+    let workout_rows = sqlx::query(
+        "SELECT id, date, name, workout_type, duration_mins FROM workouts \
+         WHERE user_id = ? ORDER BY date DESC LIMIT 50",
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let mut workout_lines = Vec::new();
+    for row in &workout_rows {
+        let wid: String = row.try_get("id").map_err(AppError::from)?;
+        let date: String = row.try_get("date").map_err(AppError::from)?;
+        let name: String = row.try_get("name").map_err(AppError::from)?;
+        let wtype: String = row.try_get("workout_type").map_err(AppError::from)?;
+        let duration: Option<i64> = row.try_get("duration_mins").map_err(AppError::from)?;
+
+        let ex_rows = sqlx::query(
+            "SELECT e.name, we.sets, we.reps, we.weight_kg, we.weight_note, we.duration_secs \
+             FROM workout_exercises we \
+             JOIN exercises e ON e.id = we.exercise_id \
+             WHERE we.workout_id = ? ORDER BY we.order_index ASC",
+        )
+        .bind(&wid)
+        .fetch_all(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+        let mut ex_parts: Vec<String> = Vec::new();
+        for ex in &ex_rows {
+            let ex_name: String = ex.try_get("name").map_err(AppError::from)?;
+            let sets: Option<i64> = ex.try_get("sets").map_err(AppError::from)?;
+            let reps: Option<i64> = ex.try_get("reps").map_err(AppError::from)?;
+            let weight: Option<f64> = ex.try_get("weight_kg").map_err(AppError::from)?;
+            let weight_note: Option<String> = ex.try_get("weight_note").map_err(AppError::from)?;
+            let dur_secs: Option<i64> = ex.try_get("duration_secs").map_err(AppError::from)?;
+
+            let detail = match (sets, reps, weight) {
+                (Some(s), Some(r), Some(w)) => format!("{ex_name} {s}x{r}@{w}kg"),
+                (Some(s), Some(r), None) => match weight_note {
+                    Some(wn) => format!("{ex_name} {s}x{r} {wn}"),
+                    None => format!("{ex_name} {s}x{r}"),
+                },
+                (None, Some(r), None) => format!("{ex_name} x{r}"),
+                _ => match dur_secs {
+                    Some(d) => format!("{ex_name} {d}s"),
+                    None => ex_name,
+                },
+            };
+            ex_parts.push(detail);
+        }
+
+        let dur_str = duration.map_or(String::new(), |d| format!(" | {d}min"));
+        let ex_str = if ex_parts.is_empty() {
+            String::new()
+        } else {
+            format!(" | {}", ex_parts.join(", "))
+        };
+        workout_lines.push(format!("{date} | {wtype}{dur_str} | {name}{ex_str}"));
+    }
+    let workouts_context = workout_lines.join("\n");
+
+    // --- Recent health metrics (optional context) ---
+    let health_rows = sqlx::query(
+        "SELECT metric_name, recorded_date, status, encrypted_value, nonce \
+         FROM health_metrics WHERE user_id = ? ORDER BY recorded_date DESC LIMIT 30",
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let mut health_lines: Vec<String> = Vec::new();
+    for row in &health_rows {
+        let metric_name: String = row.try_get("metric_name").map_err(AppError::from)?;
+        let recorded_date: String = row.try_get("recorded_date").map_err(AppError::from)?;
+        let status: String = row.try_get("status").map_err(AppError::from)?;
+        let enc: Vec<u8> = row.try_get("encrypted_value").map_err(AppError::from)?;
+        let nonce: Vec<u8> = row.try_get("nonce").map_err(AppError::from)?;
+
+        if let Ok(bytes) = crypto::decrypt(&state.encryption_key, &enc, &nonce) {
+            if let Ok(mv) = serde_json::from_slice::<crate::health::MetricValue>(&bytes) {
+                health_lines.push(format!(
+                    "{recorded_date} | {metric_name}: {} {} ({})",
+                    mv.value, mv.unit, status
+                ));
+            }
+        }
+    }
+    let health_context = health_lines.join("\n");
+
+    let analysis = ai::analyze_workouts(
+        &state.http_client,
+        &state.anthropic_api_key,
+        &state.anthropic_model,
+        &stats_context,
+        &workouts_context,
+        &health_context,
+    )
+    .await?;
+
+    Ok(Json(analysis))
 }
 
 /// Compute the current streak in days ending at (or including) `today`.

@@ -1,4 +1,5 @@
 import { GenerateWorkoutDialog } from '@/features/workouts/components/GenerateWorkoutDialog'
+import { WorkoutAnalysisDialog } from '@/features/workouts/components/WorkoutAnalysisDialog'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
 import { StatsPanel } from './StatsPanel'
 import { WorkoutDetailPanel } from './WorkoutDetailPanel'
@@ -38,7 +39,10 @@ export function WorkoutsMainPanel() {
             Stats
           </button>
         </div>
-        <GenerateWorkoutDialog />
+        <div className="flex items-center gap-2">
+          <WorkoutAnalysisDialog />
+          <GenerateWorkoutDialog />
+        </div>
       </div>
 
       {/* Tab content */}

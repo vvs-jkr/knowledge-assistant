@@ -81,7 +81,7 @@ pub struct WorkoutLog {
     pub created_at: String,
 }
 
-/// Heatmap data point — one entry per day that has at least one workout.
+/// Heatmap data point -- one entry per day that has at least one workout.
 #[derive(Debug, Serialize)]
 pub struct HeatmapEntry {
     pub date: String,
@@ -122,6 +122,23 @@ pub struct WorkoutStats {
     pub total_workouts: i64,
     pub total_logs: i64,
     pub current_streak_days: i64,
+}
+
+/// AI analysis of the user's full workout history.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WorkoutAnalysis {
+    /// Overall assessment of the training history.
+    pub summary: String,
+    /// Recurring training patterns found.
+    pub patterns: Vec<String>,
+    /// Muscle group balance assessment.
+    pub muscle_balance: String,
+    /// What's going well in the training.
+    pub strengths: Vec<String>,
+    /// Concrete recommendations for improvement.
+    pub improvements: Vec<String>,
+    /// Suggested next focus: `"cardio"`, `"mass"`, `"strength"`, or `"mixed"`.
+    pub suggested_focus: String,
 }
 
 // ---------------------------------------------------------------------------
