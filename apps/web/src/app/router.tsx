@@ -1,5 +1,6 @@
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
+import { ChatPage } from '@/pages/chat/ChatPage'
 import { HealthPage } from '@/pages/health/HealthPage'
 import { KnowledgePage } from '@/pages/knowledge/KnowledgePage'
 import { NotesPage } from '@/pages/notes/NotesPage'
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
           { path: 'workouts', element: <WorkoutsPage /> },
           { path: 'workouts/:id', element: <WorkoutDetailPage /> },
           { path: 'knowledge', element: <KnowledgePage /> },
+          { path: 'chat', element: <ChatPage /> },
         ],
       },
     ],

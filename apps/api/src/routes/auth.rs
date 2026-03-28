@@ -211,7 +211,10 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<
         .map_err(AppError::from)?;
     }
 
-    Ok((StatusCode::OK, [(SET_COOKIE, build_clear_refresh_cookie(state.cookie_secure))]))
+    Ok((
+        StatusCode::OK,
+        [(SET_COOKIE, build_clear_refresh_cookie(state.cookie_secure))],
+    ))
 }
 
 // ---------------------------------------------------------------------------

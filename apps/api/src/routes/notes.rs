@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
+use sqlx::Row as _;
 
 use crate::{
     ai,
@@ -110,7 +111,7 @@ async fn upload_note(
         .await
         .map_err(AppError::from)?;
 
-        // Generate and store embedding — failure is non-fatal.
+        // Generate and store embedding -- failure is non-fatal.
         spawn_embedding(&state, note_id.clone(), content_str.to_owned());
 
         uploaded.push(NoteMetadata {
@@ -170,7 +171,8 @@ async fn list_notes(
     let notes = rows
         .into_iter()
         .map(|r| -> ApiResult<NoteMetadata> {
-            let frontmatter_str: Option<String> = r.try_get("frontmatter").map_err(AppError::from)?;
+            let frontmatter_str: Option<String> =
+                r.try_get("frontmatter").map_err(AppError::from)?;
             let frontmatter = frontmatter_str
                 .as_deref()
                 .and_then(|s| serde_json::from_str(s).ok());
@@ -280,7 +282,7 @@ async fn update_note(
     .await
     .map_err(AppError::from)?;
 
-    // Re-generate embedding — failure is non-fatal.
+    // Re-generate embedding -- failure is non-fatal.
     spawn_embedding(&state, id.clone(), body.content.clone());
 
     Ok(Json(NoteMetadata {
@@ -316,7 +318,7 @@ async fn delete_note(
         return Err(AppError::NotFound);
     }
 
-    // Clean up embedding — failure is non-fatal.
+    // Clean up embedding -- failure is non-fatal.
     if let Err(e) = embeddings::delete_embedding(&state.db, &id).await {
         tracing::warn!("Failed to delete embedding for note {id}: {e}");
     }
@@ -522,7 +524,7 @@ async fn analyze_note_handler(
             let text = String::from_utf8_lossy(&bytes);
             let preview: String = text.chars().take(200).collect();
             context_lines.push(format!(
-                "- [{}] (id: {}): {}…",
+                "- [{}] (id: {}): {}...",
                 note.filename, note_id, preview
             ));
         } else {
@@ -564,17 +566,15 @@ async fn improve_note_handler(
         ));
     }
 
-    let row = sqlx::query(
-        "SELECT encrypted_content, nonce FROM note_files WHERE id = ? AND user_id = ?",
-    )
-    .bind(&id)
-    .bind(&claims.sub)
-    .fetch_optional(&state.db)
-    .await
-    .map_err(AppError::from)?
-    .ok_or(AppError::NotFound)?;
+    let row =
+        sqlx::query("SELECT encrypted_content, nonce FROM note_files WHERE id = ? AND user_id = ?")
+            .bind(&id)
+            .bind(&claims.sub)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(AppError::from)?
+            .ok_or(AppError::NotFound)?;
 
-    use sqlx::Row as _;
     let encrypted_content: Vec<u8> = row.try_get("encrypted_content").map_err(AppError::from)?;
     let nonce: Vec<u8> = row.try_get("nonce").map_err(AppError::from)?;
     let plaintext = crypto::decrypt(&state.encryption_key, &encrypted_content, &nonce)?;
@@ -623,14 +623,14 @@ fn make_snippet(content: &str, query: &str, max_len: usize) -> String {
     let snippet: String = content[start..].chars().take(max_len).collect();
 
     if start == 0 {
-        format!("{snippet}…")
+        format!("{snippet}...")
     } else {
-        format!("…{snippet}…")
+        format!("...{snippet}...")
     }
 }
 
 /// Spawns a background task to generate and store an embedding for `note_id`.
-/// Logs a warning on failure — never panics, never fails the calling request.
+/// Logs a warning on failure -- never panics, never fails the calling request.
 fn spawn_embedding(state: &AppState, note_id: String, content: String) {
     if state.voyage_api_key.is_empty() {
         return;

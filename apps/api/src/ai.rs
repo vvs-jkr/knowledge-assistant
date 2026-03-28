@@ -311,7 +311,10 @@ Rules:
 fn extract_json_object(text: &str) -> &str {
     // First strip any markdown code fences.
     let text = text.trim();
-    let inner = if let Some(rest) = text.strip_prefix("```json").or_else(|| text.strip_prefix("```")) {
+    let inner = if let Some(rest) = text
+        .strip_prefix("```json")
+        .or_else(|| text.strip_prefix("```"))
+    {
         // Skip to end of opening fence line.
         let after_fence = match rest.find('\n') {
             Some(pos) => &rest[pos + 1..],
@@ -365,14 +368,14 @@ pub async fn improve_note(
 }
 
 fn improve_system_prompt() -> String {
-    r#"You are an expert technical writer and knowledge manager. The user will provide a note in Markdown format. Improve it:
+    r"You are an expert technical writer and knowledge manager. The user will provide a note in Markdown format. Improve it:
 - Fix grammar, spelling, and style
 - Improve structure with proper headings, lists, and formatting
 - Make it clearer and more concise
 - Preserve all original information -- do not invent or omit facts
 - Keep existing YAML frontmatter intact (do not remove or modify it)
 - Return ONLY the improved Markdown content -- no explanations, no code fences
-Respond in the same language as the original note."#
+Respond in the same language as the original note."
         .into()
 }
 
@@ -380,8 +383,9 @@ Respond in the same language as the original note."#
 // Workout generation
 // ---------------------------------------------------------------------------
 
-/// Asks the AI to generate a structured workout based on `prompt` and optional
-/// `knowledge_context` (RAG excerpts from the user's knowledge base).
+/// Asks the AI to generate a structured workout based on `prompt`, optional
+/// `knowledge_context` (RAG excerpts), and optional `workout_history_context`
+/// (cached analysis + recent workouts for personalisation).
 ///
 /// # Errors
 ///
@@ -392,9 +396,11 @@ pub async fn generate_workout(
     anthropic_model: &str,
     prompt: &str,
     knowledge_context: &str,
+    workout_history_context: &str,
 ) -> ApiResult<WorkoutDraft> {
     let system = workout_generation_system_prompt();
-    let user_content = build_workout_generation_message(prompt, knowledge_context);
+    let user_content =
+        build_workout_generation_message(prompt, knowledge_context, workout_history_context);
 
     let text = call_openrouter(
         http_client,
@@ -411,7 +417,7 @@ pub async fn generate_workout(
 }
 
 fn workout_generation_system_prompt() -> String {
-    r#"You are an expert fitness coach. Generate a workout based on the user's request.
+    r#"You are an expert personal fitness coach with access to the user's full training history and analysis. Generate a workout based on the user's request.
 
 Return ONLY valid JSON -- no markdown fences, no extra text -- with exactly this structure:
 {
@@ -436,18 +442,29 @@ Rules:
 - exercises: at least 3, ordered logically (warm-up to cool-down)
 - sets/reps: integers or null if not applicable (e.g. cardio)
 - weight_note: qualitative guidance or null
+- Use the training history and analysis (if provided) to personalise the workout: respect the athlete's patterns, address muscle imbalances, and build on their methodology
+- Occasionally you may suggest repeating a successful workout from history, noting it's from their archive
 - Always respond in Russian language (name, notes, weight_note fields)"#
         .into()
 }
 
-fn build_workout_generation_message(prompt: &str, knowledge_context: &str) -> String {
-    if knowledge_context.is_empty() {
-        prompt.to_owned()
-    } else {
-        format!(
-            "{prompt}\n\n---\nRelevant knowledge base excerpts:\n{knowledge_context}"
-        )
+fn build_workout_generation_message(
+    prompt: &str,
+    knowledge_context: &str,
+    workout_history_context: &str,
+) -> String {
+    let mut parts = vec![prompt.to_owned()];
+    if !workout_history_context.is_empty() {
+        parts.push(format!(
+            "---\nTraining history context:\n{workout_history_context}"
+        ));
     }
+    if !knowledge_context.is_empty() {
+        parts.push(format!(
+            "---\nRelevant knowledge base excerpts:\n{knowledge_context}"
+        ));
+    }
+    parts.join("\n\n")
 }
 
 // ---------------------------------------------------------------------------
@@ -467,7 +484,8 @@ pub async fn analyze_workouts(
     workouts_context: &str,
     health_context: &str,
 ) -> ApiResult<WorkoutAnalysis> {
-    let user_message = build_workout_analysis_message(stats_context, workouts_context, health_context);
+    let user_message =
+        build_workout_analysis_message(stats_context, workouts_context, health_context);
 
     let text = call_openrouter(
         http_client,
@@ -479,8 +497,11 @@ pub async fn analyze_workouts(
     )
     .await?;
 
-    serde_json::from_str::<WorkoutAnalysis>(extract_json_object(&text))
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Failed to parse workout analysis JSON: {e}")))
+    serde_json::from_str::<WorkoutAnalysis>(extract_json_object(&text)).map_err(|e| {
+        AppError::Internal(anyhow::anyhow!(
+            "Failed to parse workout analysis JSON: {e}"
+        ))
+    })
 }
 
 fn workout_analysis_system_prompt() -> String {
@@ -506,11 +527,101 @@ Rules:
 }
 
 fn build_workout_analysis_message(stats: &str, workouts: &str, health: &str) -> String {
-    let mut msg = format!("## Workout Statistics\n{stats}\n\n## Recent Workouts (last 50)\n{workouts}");
+    use std::fmt::Write as _;
+    let mut msg = format!("## Workout Statistics\n{stats}\n\n## Full Workout History\n{workouts}");
     if !health.is_empty() {
-        msg.push_str(&format!("\n\n## Body Composition (InBody / Lab)\n{health}"));
+        let _ = write!(msg, "\n\n## Body Composition (InBody / Lab)\n{health}");
     }
     msg
+}
+
+// ---------------------------------------------------------------------------
+// Chat assistant
+// ---------------------------------------------------------------------------
+
+/// A message in the conversation history sent to the AI.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChatTurn {
+    /// `"user"` or `"assistant"`
+    pub role: String,
+    pub content: String,
+}
+
+/// Send a chat message to the AI with full conversation history and optional
+/// training context (analysis + health metrics summary).
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the API call fails.
+pub async fn chat(
+    http_client: &reqwest::Client,
+    api_key: &str,
+    model: &str,
+    history: &[ChatTurn],
+    training_context: &str,
+) -> ApiResult<String> {
+    let system = chat_system_prompt(training_context);
+
+    // Build messages array: history + new user message (last item in history).
+    let messages: Vec<serde_json::Value> = history
+        .iter()
+        .map(|t| serde_json::json!({ "role": t.role, "content": t.content }))
+        .collect();
+
+    let body = serde_json::json!({
+        "model": model,
+        "max_tokens": 1024,
+        "system": system,
+        "messages": messages,
+    });
+
+    let resp = http_client
+        .post("https://openrouter.ai/api/v1/chat/completions")
+        .bearer_auth(api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("chat request failed: {e}")))?;
+
+    let status = resp.status();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("read chat response: {e}")))?;
+
+    if !status.is_success() {
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "chat API error {status}: {text}"
+        )));
+    }
+
+    let val: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("parse chat response: {e}")))?;
+
+    val["choices"][0]["message"]["content"]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| AppError::Internal(anyhow::anyhow!("missing content in chat response")))
+}
+
+fn chat_system_prompt(training_context: &str) -> String {
+    let mut prompt = String::from(
+        "Ты персональный фитнес-тренер и консультант по здоровью. \
+Твоя роль -- помогать пользователю с тренировками, восстановлением, питанием и интерпретацией показателей здоровья. \
+\n\nПравила:\
+\n- Отвечай ТОЛЬКО на русском языке\
+\n- Отвечай ТОЛЬКО на вопросы, связанные с фитнесом, тренировками, здоровьем, питанием и телесными показателями\
+\n- Если вопрос не по теме -- вежливо откажись и предложи обсудить что-то связанное со здоровьем или тренировками\
+\n- Давай конкретные, практичные советы основанные на данных пользователя\
+\n- Будь краток и по делу, без лишней воды",
+    );
+
+    if !training_context.is_empty() {
+        use std::fmt::Write as _;
+        let _ = write!(prompt, "\n\n---\nДанные пользователя:\n{training_context}");
+    }
+
+    prompt
 }
 
 // ---------------------------------------------------------------------------

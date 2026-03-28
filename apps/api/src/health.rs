@@ -178,7 +178,12 @@ pub fn parse_inbody_csv(data: &[u8]) -> Result<LabExtraction, AppError> {
             "Cannot parse date from CSV column 0 (expected YYYYMMDDHHMMSS)".into(),
         ));
     }
-    let lab_date = format!("{}-{}-{}", &date_raw[0..4], &date_raw[4..6], &date_raw[6..8]);
+    let lab_date = format!(
+        "{}-{}-{}",
+        &date_raw[0..4],
+        &date_raw[4..6],
+        &date_raw[6..8]
+    );
 
     // Column 1: device model
     let device = cols.get(1).copied().unwrap_or("").trim();

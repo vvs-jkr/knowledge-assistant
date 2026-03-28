@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod auth;
+pub mod chat;
 pub mod config;
 pub mod crypto;
 pub mod db;
@@ -22,6 +23,7 @@ pub fn build_app(state: config::AppState) -> Router {
         .merge(routes::notes::router())
         .merge(routes::health::router())
         .merge(routes::workouts::router())
+        .merge(routes::chat::router())
         .merge(routes::knowledge::router())
         .layer(
             CorsLayer::new()

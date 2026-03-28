@@ -213,14 +213,12 @@ async fn delete_knowledge(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
-    let result = sqlx::query(
-        "DELETE FROM knowledge_base WHERE id = ? AND user_id = ?",
-    )
-    .bind(&id)
-    .bind(&claims.sub)
-    .execute(&state.db)
-    .await
-    .map_err(AppError::from)?;
+    let result = sqlx::query("DELETE FROM knowledge_base WHERE id = ? AND user_id = ?")
+        .bind(&id)
+        .bind(&claims.sub)
+        .execute(&state.db)
+        .await
+        .map_err(AppError::from)?;
 
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound);
@@ -258,9 +256,7 @@ fn spawn_knowledge_embedding(state: &AppState, entry_id: String, content: String
                 if let Err(e) =
                     embeddings::upsert_knowledge_embedding(&state.db, &entry_id, &emb).await
                 {
-                    tracing::warn!(
-                        "Failed to store knowledge embedding for {entry_id}: {e}"
-                    );
+                    tracing::warn!("Failed to store knowledge embedding for {entry_id}: {e}");
                 }
             }
             Err(e) => {

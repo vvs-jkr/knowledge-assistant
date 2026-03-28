@@ -7,7 +7,9 @@ use axum::{
 use sqlx::Row as _;
 
 use crate::{
-    ai, config::AppState, crypto, embeddings,
+    ai,
+    config::AppState,
+    crypto, embeddings,
     error::{ApiResult, AppError},
     middleware::AuthUser,
     workouts::{
@@ -23,7 +25,10 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/workouts", get(list_workouts).post(create_workout))
         .route("/workouts/generate", axum::routing::post(generate_workout))
-        .route("/workouts/analyze", axum::routing::post(analyze_workouts_handler))
+        .route(
+            "/workouts/analyze",
+            axum::routing::post(analyze_workouts_handler),
+        )
         .route("/workouts/stats", get(get_stats))
         .route("/workouts/exercises", get(list_exercises))
         .route("/workouts/logs", get(list_logs).post(create_log))
@@ -782,6 +787,86 @@ async fn insert_exercises(
 }
 
 // ---------------------------------------------------------------------------
+// Shared helper: format workouts as compact text for AI context
+// ---------------------------------------------------------------------------
+
+/// Fetch up to `limit` most recent workouts for `user_id` and format them as
+/// compact text lines suitable for LLM context.
+///
+/// # Errors
+///
+/// Returns [`AppError`] if a database query fails.
+async fn format_workouts_compact(
+    db: &sqlx::SqlitePool,
+    user_id: &str,
+    limit: i64,
+) -> ApiResult<String> {
+    let workout_rows = sqlx::query(
+        "SELECT id, date, name, workout_type, duration_mins FROM workouts \
+         WHERE user_id = ? ORDER BY date DESC LIMIT ?",
+    )
+    .bind(user_id)
+    .bind(limit)
+    .fetch_all(db)
+    .await
+    .map_err(AppError::from)?;
+
+    let mut lines = Vec::new();
+    for row in &workout_rows {
+        let wid: String = row.try_get("id").map_err(AppError::from)?;
+        let date: String = row.try_get("date").map_err(AppError::from)?;
+        let name: String = row.try_get("name").map_err(AppError::from)?;
+        let wtype: String = row.try_get("workout_type").map_err(AppError::from)?;
+        let duration: Option<i64> = row.try_get("duration_mins").map_err(AppError::from)?;
+
+        let ex_rows = sqlx::query(
+            "SELECT e.name, we.sets, we.reps, we.weight_kg, we.weight_note, we.duration_secs \
+             FROM workout_exercises we \
+             JOIN exercises e ON e.id = we.exercise_id \
+             WHERE we.workout_id = ? ORDER BY we.order_index ASC",
+        )
+        .bind(&wid)
+        .fetch_all(db)
+        .await
+        .map_err(AppError::from)?;
+
+        let mut ex_parts: Vec<String> = Vec::new();
+        for ex in &ex_rows {
+            let ex_name: String = ex.try_get("name").map_err(AppError::from)?;
+            let sets: Option<i64> = ex.try_get("sets").map_err(AppError::from)?;
+            let reps: Option<i64> = ex.try_get("reps").map_err(AppError::from)?;
+            let weight: Option<f64> = ex.try_get("weight_kg").map_err(AppError::from)?;
+            let weight_note: Option<String> = ex.try_get("weight_note").map_err(AppError::from)?;
+            let dur_secs: Option<i64> = ex.try_get("duration_secs").map_err(AppError::from)?;
+
+            let detail = match (sets, reps, weight) {
+                (Some(s), Some(r), Some(w)) => format!("{ex_name} {s}x{r}@{w}kg"),
+                (Some(s), Some(r), None) => match weight_note {
+                    Some(wn) => format!("{ex_name} {s}x{r} {wn}"),
+                    None => format!("{ex_name} {s}x{r}"),
+                },
+                (None, Some(r), None) => format!("{ex_name} x{r}"),
+                _ => match dur_secs {
+                    Some(d) => format!("{ex_name} {d}s"),
+                    None => ex_name,
+                },
+            };
+            ex_parts.push(detail);
+        }
+
+        let dur_str = duration.map_or(String::new(), |d| format!(" | {d}min"));
+        let ex_str = if ex_parts.is_empty() {
+            String::new()
+        } else {
+            format!(" | {}", ex_parts.join(", "))
+        };
+        lines.push(format!("{date} | {wtype}{dur_str} | {name}{ex_str}"));
+    }
+
+    Ok(lines.join("\n"))
+}
+
+// ---------------------------------------------------------------------------
 // POST /workouts/generate
 // ---------------------------------------------------------------------------
 
@@ -800,6 +885,35 @@ async fn generate_workout(
         ));
     }
 
+    // Build workout history context: cached analysis + last 20 workouts.
+    let cached_analysis: Option<String> =
+        sqlx::query_scalar("SELECT analysis FROM workout_analysis_cache WHERE user_id = ?")
+            .bind(&claims.sub)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(AppError::from)?;
+
+    let all_workouts = format_workouts_compact(&state.db, &claims.sub, i64::MAX).await?;
+
+    let workout_history_context = {
+        let mut parts = Vec::new();
+        if let Some(analysis_json) = cached_analysis {
+            if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&analysis_json) {
+                parts.push(format!(
+                    "## Training Analysis\nSummary: {}\nPatterns: {}\nMuscle balance: {}\nSuggested focus: {}",
+                    analysis.summary,
+                    analysis.patterns.join("; "),
+                    analysis.muscle_balance,
+                    analysis.suggested_focus,
+                ));
+            }
+        }
+        if !all_workouts.is_empty() {
+            parts.push(format!("## Full Workout History\n{all_workouts}"));
+        }
+        parts.join("\n\n")
+    };
+
     // Build RAG context from knowledge base if Voyage is configured.
     let (knowledge_context, knowledge_ids) =
         build_rag_context(&state, &claims.sub, &prompt).await?;
@@ -810,6 +924,7 @@ async fn generate_workout(
         &state.anthropic_model,
         &prompt,
         &knowledge_context,
+        &workout_history_context,
     )
     .await?;
 
@@ -915,6 +1030,7 @@ async fn build_rag_context(
 // POST /workouts/analyze
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_lines)]
 async fn analyze_workouts_handler(
     AuthUser(claims): AuthUser,
     State(state): State<AppState>,
@@ -927,14 +1043,44 @@ async fn analyze_workouts_handler(
 
     let user_id = &claims.sub;
 
-    // --- Aggregated stats ---
-    let total_workouts: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM workouts WHERE user_id = ?")
+    // --- Check if cache is still valid ---
+    let total_workouts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM workouts WHERE user_id = ?")
+        .bind(user_id)
+        .fetch_one(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+    let last_workout_date: Option<String> =
+        sqlx::query_scalar("SELECT MAX(date) FROM workouts WHERE user_id = ?")
             .bind(user_id)
             .fetch_one(&state.db)
             .await
             .map_err(AppError::from)?;
 
+    let last_date = last_workout_date.unwrap_or_default();
+
+    let cache_row = sqlx::query(
+        "SELECT analysis, workout_count, last_workout_date \
+         FROM workout_analysis_cache WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    if let Some(row) = cache_row {
+        let cached_count: i64 = row.try_get("workout_count").map_err(AppError::from)?;
+        let cached_date: String = row.try_get("last_workout_date").map_err(AppError::from)?;
+        if cached_count == total_workouts && cached_date == last_date {
+            let cached_json: String = row.try_get("analysis").map_err(AppError::from)?;
+            let analysis = serde_json::from_str::<WorkoutAnalysis>(&cached_json).map_err(|e| {
+                AppError::Internal(anyhow::anyhow!("deserialize cached analysis: {e}"))
+            })?;
+            return Ok(Json(analysis));
+        }
+    }
+
+    // --- Cache miss: build full context and call AI ---
     let type_rows = sqlx::query(
         "SELECT workout_type, COUNT(*) AS cnt FROM workouts \
          WHERE user_id = ? GROUP BY workout_type ORDER BY cnt DESC",
@@ -956,68 +1102,8 @@ async fn analyze_workouts_handler(
         type_lines.join("\n")
     );
 
-    // --- Last 50 workouts with exercises (compact text) ---
-    let workout_rows = sqlx::query(
-        "SELECT id, date, name, workout_type, duration_mins FROM workouts \
-         WHERE user_id = ? ORDER BY date DESC LIMIT 50",
-    )
-    .bind(user_id)
-    .fetch_all(&state.db)
-    .await
-    .map_err(AppError::from)?;
-
-    let mut workout_lines = Vec::new();
-    for row in &workout_rows {
-        let wid: String = row.try_get("id").map_err(AppError::from)?;
-        let date: String = row.try_get("date").map_err(AppError::from)?;
-        let name: String = row.try_get("name").map_err(AppError::from)?;
-        let wtype: String = row.try_get("workout_type").map_err(AppError::from)?;
-        let duration: Option<i64> = row.try_get("duration_mins").map_err(AppError::from)?;
-
-        let ex_rows = sqlx::query(
-            "SELECT e.name, we.sets, we.reps, we.weight_kg, we.weight_note, we.duration_secs \
-             FROM workout_exercises we \
-             JOIN exercises e ON e.id = we.exercise_id \
-             WHERE we.workout_id = ? ORDER BY we.order_index ASC",
-        )
-        .bind(&wid)
-        .fetch_all(&state.db)
-        .await
-        .map_err(AppError::from)?;
-
-        let mut ex_parts: Vec<String> = Vec::new();
-        for ex in &ex_rows {
-            let ex_name: String = ex.try_get("name").map_err(AppError::from)?;
-            let sets: Option<i64> = ex.try_get("sets").map_err(AppError::from)?;
-            let reps: Option<i64> = ex.try_get("reps").map_err(AppError::from)?;
-            let weight: Option<f64> = ex.try_get("weight_kg").map_err(AppError::from)?;
-            let weight_note: Option<String> = ex.try_get("weight_note").map_err(AppError::from)?;
-            let dur_secs: Option<i64> = ex.try_get("duration_secs").map_err(AppError::from)?;
-
-            let detail = match (sets, reps, weight) {
-                (Some(s), Some(r), Some(w)) => format!("{ex_name} {s}x{r}@{w}kg"),
-                (Some(s), Some(r), None) => match weight_note {
-                    Some(wn) => format!("{ex_name} {s}x{r} {wn}"),
-                    None => format!("{ex_name} {s}x{r}"),
-                },
-                (None, Some(r), None) => format!("{ex_name} x{r}"),
-                _ => match dur_secs {
-                    Some(d) => format!("{ex_name} {d}s"),
-                    None => ex_name,
-                },
-            };
-            ex_parts.push(detail);
-        }
-
-        let dur_str = duration.map_or(String::new(), |d| format!(" | {d}min"));
-        let ex_str = if ex_parts.is_empty() {
-            String::new()
-        } else {
-            format!(" | {}", ex_parts.join(", "))
-        };
-        workout_lines.push(format!("{date} | {wtype}{dur_str} | {name}{ex_str}"));
-    }
-    let workouts_context = workout_lines.join("\n");
+    // All workouts in compact format via shared helper (no limit -- full history).
+    let workouts_context = format_workouts_compact(&state.db, user_id, i64::MAX).await?;
 
     // --- Recent health metrics (optional context) ---
     let health_rows = sqlx::query(
@@ -1057,6 +1143,27 @@ async fn analyze_workouts_handler(
         &health_context,
     )
     .await?;
+
+    // --- Save result to cache ---
+    let analysis_json = serde_json::to_string(&analysis)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize analysis: {e}")))?;
+    let cache_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    sqlx::query(
+        "INSERT OR REPLACE INTO workout_analysis_cache \
+         (id, user_id, analysis, workout_count, last_workout_date, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&cache_id)
+    .bind(user_id)
+    .bind(&analysis_json)
+    .bind(total_workouts)
+    .bind(&last_date)
+    .bind(&now)
+    .execute(&state.db)
+    .await
+    .map_err(AppError::from)?;
 
     Ok(Json(analysis))
 }

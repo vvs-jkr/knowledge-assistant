@@ -57,19 +57,19 @@ async fn upload_health(
 
         match field_name.as_str() {
             "file" => {
-                let filename = field
+                let uploaded_name = field
                     .file_name()
                     .ok_or_else(|| AppError::BadRequest("Missing filename in file field".into()))?
                     .to_owned();
 
-                let ext = std::path::Path::new(&filename)
+                let ext = std::path::Path::new(&uploaded_name)
                     .extension()
                     .and_then(|e| e.to_str())
                     .unwrap_or("")
                     .to_ascii_lowercase();
                 if ext != "pdf" && ext != "csv" {
                     return Err(AppError::BadRequest(format!(
-                        "Only PDF or CSV files are accepted, got: {filename}"
+                        "Only PDF or CSV files are accepted, got: {uploaded_name}"
                     )));
                 }
 
@@ -82,18 +82,20 @@ async fn upload_health(
                     return Err(AppError::PayloadTooLarge);
                 }
 
-                file_name = Some(filename);
+                file_name = Some(uploaded_name);
                 file_bytes = Some(data.to_vec());
             }
             "lab_date" => {
-                lab_date_field = Some(field.text().await.map_err(|e| {
-                    AppError::BadRequest(format!("failed to read lab_date: {e}"))
-                })?);
+                lab_date_field =
+                    Some(field.text().await.map_err(|e| {
+                        AppError::BadRequest(format!("failed to read lab_date: {e}"))
+                    })?);
             }
             "lab_name" => {
-                lab_name_field = Some(field.text().await.map_err(|e| {
-                    AppError::BadRequest(format!("failed to read lab_name: {e}"))
-                })?);
+                lab_name_field =
+                    Some(field.text().await.map_err(|e| {
+                        AppError::BadRequest(format!("failed to read lab_name: {e}"))
+                    })?);
             }
             _ => {
                 let _ = field.bytes().await;
@@ -101,8 +103,7 @@ async fn upload_health(
         }
     }
 
-    let file_bytes =
-        file_bytes.ok_or_else(|| AppError::BadRequest("No file provided".into()))?;
+    let file_bytes = file_bytes.ok_or_else(|| AppError::BadRequest("No file provided".into()))?;
     let file_name = file_name.expect("set when file_bytes is Some");
 
     let file_ext = std::path::Path::new(&file_name)

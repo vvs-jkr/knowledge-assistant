@@ -1,6 +1,14 @@
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Activity, BookOpen, ChevronLeft, ChevronRight, FileText, Heart } from 'lucide-react'
+import {
+  Activity,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Heart,
+  MessageCircle,
+} from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 const NAV_LINKS = [
@@ -8,6 +16,7 @@ const NAV_LINKS = [
   { to: '/health', label: 'Health', icon: Heart },
   { to: '/workouts', label: 'Workouts', icon: Activity },
   { to: '/knowledge', label: 'Knowledge', icon: BookOpen },
+  { to: '/chat', label: 'Coach', icon: MessageCircle },
 ]
 
 interface AppSidebarProps {
