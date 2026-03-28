@@ -13,6 +13,7 @@ use crate::{
     crypto,
     error::{ApiResult, AppError},
     middleware::AuthUser,
+    routes::workouts::format_workouts_compact,
     workouts::WorkoutAnalysis,
 };
 
@@ -399,6 +400,12 @@ async fn build_training_context(state: &AppState, user_id: &str) -> ApiResult<St
                 analysis.suggested_focus,
             ));
         }
+    }
+
+    // Recent workout examples (last 20) -- so AI can match style and format.
+    let recent_workouts = format_workouts_compact(&state.db, user_id, 50).await?;
+    if !recent_workouts.is_empty() {
+        parts.push(format!("## Примеры последних тренировок\n{recent_workouts}"));
     }
 
     // Recent health metrics (last 30).

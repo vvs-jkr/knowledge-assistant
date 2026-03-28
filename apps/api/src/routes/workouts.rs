@@ -796,7 +796,7 @@ async fn insert_exercises(
 /// # Errors
 ///
 /// Returns [`AppError`] if a database query fails.
-async fn format_workouts_compact(
+pub async fn format_workouts_compact(
     db: &sqlx::SqlitePool,
     user_id: &str,
     limit: i64,

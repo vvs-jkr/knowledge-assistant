@@ -528,7 +528,15 @@ Rules:
 
 fn build_workout_analysis_message(stats: &str, workouts: &str, health: &str) -> String {
     use std::fmt::Write as _;
-    let mut msg = format!("## Workout Statistics\n{stats}\n\n## Full Workout History\n{workouts}");
+    let context_note = "## Important Context\n\
+        The workouts in this database are a functional training / CrossFit-style group program \
+        written for a team of athletes. \
+        The individual athlete selects 3-4 sessions per week based on how they feel -- \
+        not all recorded sessions were performed by one person. \
+        Do NOT interpret the total session count as daily solo training volume. \
+        The gym does NOT have gymnastic rings or climbing rope -- do not recommend exercises \
+        requiring this equipment.\n\n";
+    let mut msg = format!("{context_note}## Workout Statistics\n{stats}\n\n## Full Workout History\n{workouts}");
     if !health.is_empty() {
         let _ = write!(msg, "\n\n## Body Composition (InBody / Lab)\n{health}");
     }
