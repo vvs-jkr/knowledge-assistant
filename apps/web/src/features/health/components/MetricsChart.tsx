@@ -11,7 +11,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { TooltipProps } from 'recharts'
 
 interface MetricInfo {
   en: string
@@ -41,7 +40,15 @@ function getInfo(metricName: string): MetricInfo {
   return METRIC_INFO[metricName] ?? { en: metricName, ru: metricName, unit: '' }
 }
 
-function ChartTooltip({ active, payload, label, unit, ru }: TooltipProps<number, string> & { unit: string; ru: string }) {
+interface ChartTooltipProps {
+  active?: boolean
+  payload?: Array<{ value?: number }>
+  label?: string
+  unit: string
+  ru: string
+}
+
+function ChartTooltip({ active, payload, label, unit, ru }: ChartTooltipProps) {
   if (!active || !payload?.length) return null
   return (
     <div className="rounded-md border border-border bg-background px-3 py-2 text-xs shadow-md">
