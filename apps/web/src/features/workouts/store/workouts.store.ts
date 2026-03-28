@@ -9,10 +9,10 @@ interface WorkoutsFilters {
 
 interface WorkoutsState {
   selectedWorkoutId: string | null
-  activeTab: 'list' | 'stats'
+  activeTab: 'list' | 'cards' | 'stats'
   filters: WorkoutsFilters
   selectWorkout: (id: string | null) => void
-  setActiveTab: (tab: 'list' | 'stats') => void
+  setActiveTab: (tab: 'list' | 'cards' | 'stats') => void
   setFilter: (key: keyof WorkoutsFilters, value: string | null) => void
   resetFilters: () => void
 }

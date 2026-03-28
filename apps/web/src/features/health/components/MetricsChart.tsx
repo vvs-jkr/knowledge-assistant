@@ -13,18 +13,18 @@ import {
 } from 'recharts'
 
 const METRIC_LABELS: Record<string, string> = {
-  glucose: 'Glucose (mmol/L)',
-  cholesterol_total: 'Total Cholesterol (mmol/L)',
-  cholesterol_hdl: 'HDL (mmol/L)',
-  cholesterol_ldl: 'LDL (mmol/L)',
-  hemoglobin: 'Hemoglobin (g/L)',
-  platelets: 'Platelets (×10⁹/L)',
-  leukocytes: 'WBC (×10⁹/L)',
-  erythrocytes: 'RBC (×10¹²/L)',
-  esr: 'ESR (mm/h)',
-  creatinine: 'Creatinine (μmol/L)',
-  alt: 'ALT (U/L)',
-  ast: 'AST (U/L)',
+  glucose: 'Глюкоза (Glucose, mmol/L)',
+  cholesterol_total: 'Холестерин общий (Total Cholesterol, mmol/L)',
+  cholesterol_hdl: 'Холестерин ЛПВП (HDL, mmol/L)',
+  cholesterol_ldl: 'Холестерин ЛПНП (LDL, mmol/L)',
+  hemoglobin: 'Гемоглобин (Hgb, g/L)',
+  platelets: 'Тромбоциты (PLT, x10⁹/L)',
+  leukocytes: 'Лейкоциты (WBC, x10⁹/L)',
+  erythrocytes: 'Эритроциты (RBC, x10¹²/L)',
+  esr: 'СОЭ (ESR, mm/h)',
+  creatinine: 'Креатинин (Creatinine, μmol/L)',
+  alt: 'АЛТ (ALT, U/L)',
+  ast: 'АСТ (AST, U/L)',
 }
 
 interface MetricsChartProps {

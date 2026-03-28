@@ -1102,8 +1102,8 @@ async fn analyze_workouts_handler(
         type_lines.join("\n")
     );
 
-    // All workouts in compact format via shared helper (no limit -- full history).
-    let workouts_context = format_workouts_compact(&state.db, user_id, i64::MAX).await?;
+    // Last 200 workouts in compact format -- enough for pattern analysis without hitting context limits.
+    let workouts_context = format_workouts_compact(&state.db, user_id, 200).await?;
 
     // --- Recent health metrics (optional context) ---
     let health_rows = sqlx::query(

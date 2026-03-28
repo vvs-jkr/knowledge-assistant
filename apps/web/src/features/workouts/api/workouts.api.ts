@@ -32,6 +32,14 @@ type ExerciseInput = {
   notes?: string
 }
 
+type UpdateWorkoutInput = {
+  date?: string
+  name?: string
+  workout_type?: string
+  duration_mins?: number | null
+  rounds?: number | null
+}
+
 type CreateWorkoutInput = {
   date: string
   name: string
@@ -107,6 +115,9 @@ const workoutsApi = {
       return workoutLogSchema.array().parse(r.data)
     }),
 
+  update: (id: string, body: UpdateWorkoutInput): Promise<WorkoutDetail> =>
+    api.put<WorkoutDetail>(`/workouts/${id}`, body).then((r) => workoutDetailSchema.parse(r.data)),
+
   analyze: (): Promise<WorkoutAnalysis> =>
     api.post<WorkoutAnalysis>('/workouts/analyze').then((r) => {
       return workoutAnalysisSchema.parse(r.data)
@@ -160,6 +171,18 @@ export function useCreateWorkoutLog() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workouts', 'logs'] })
       qc.invalidateQueries({ queryKey: ['workouts', 'stats'] })
+    },
+  })
+}
+
+export function useUpdateWorkout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & UpdateWorkoutInput) =>
+      workoutsApi.update(id, body),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['workouts', 'list'] })
+      qc.setQueryData(['workouts', 'detail', updated.id], updated)
     },
   })
 }

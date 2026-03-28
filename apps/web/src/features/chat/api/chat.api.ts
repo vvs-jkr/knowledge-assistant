@@ -81,12 +81,27 @@ export function useSendMessage(sessionId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (content: string) => chatApi.sendMessage(sessionId, content),
-    onSuccess: (newMessage) => {
+    onMutate: (content) => {
+      const userMsg: ChatMessage = {
+        id: `temp-${Date.now()}`,
+        session_id: sessionId,
+        role: 'user',
+        content,
+        created_at: new Date().toISOString(),
+      }
       qc.setQueryData<ChatMessage[]>(['chat', 'messages', sessionId], (prev) => [
         ...(prev ?? []),
-        newMessage,
+        userMsg,
       ])
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['chat', 'messages', sessionId] })
       qc.invalidateQueries({ queryKey: ['chat', 'sessions'] })
+    },
+    onError: () => {
+      qc.setQueryData<ChatMessage[]>(['chat', 'messages', sessionId], (prev) =>
+        (prev ?? []).filter((m) => !m.id.startsWith('temp-'))
+      )
     },
   })
 }

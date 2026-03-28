@@ -2,6 +2,7 @@ import { GenerateWorkoutDialog } from '@/features/workouts/components/GenerateWo
 import { WorkoutAnalysisDialog } from '@/features/workouts/components/WorkoutAnalysisDialog'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
 import { StatsPanel } from './StatsPanel'
+import { WorkoutCardGrid } from './WorkoutCardGrid'
 import { WorkoutDetailPanel } from './WorkoutDetailPanel'
 import { WorkoutFilterBar } from './WorkoutFilterBar'
 import { WorkoutTable } from './WorkoutTable'
@@ -26,6 +27,17 @@ export function WorkoutsMainPanel() {
             }`}
           >
             Workouts
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('cards')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'cards'
+                ? 'border-b-2 border-foreground text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Карточки
           </button>
           <button
             type="button"
@@ -60,6 +72,15 @@ export function WorkoutsMainPanel() {
                 <WorkoutDetailPanel workoutId={selectedWorkoutId} />
               </aside>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'cards' && (
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <WorkoutFilterBar />
+          <div className="flex-1 overflow-hidden">
+            <WorkoutCardGrid />
           </div>
         </div>
       )}
