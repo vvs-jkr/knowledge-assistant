@@ -60,10 +60,11 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
 
   const handleSave = () => {
     if (!workout) return
+    const trimmed = name.trim()
     updateWorkout.mutate(
       {
         id: workout.id,
-        name: name.trim() || undefined,
+        ...(trimmed ? { name: trimmed } : {}),
         date,
         workout_type: workoutType,
         duration_mins: durationMins !== '' ? Number(durationMins) : null,
