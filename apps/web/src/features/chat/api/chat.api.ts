@@ -65,7 +65,14 @@ export function useDeleteSession() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => chatApi.deleteSession(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['chat', 'sessions'] }),
+    onMutate: (id) => {
+      qc.setQueryData<ChatSession[]>(['chat', 'sessions'], (prev) =>
+        (prev ?? []).filter((s) => s.id !== id),
+      )
+    },
+    onError: () => {
+      qc.invalidateQueries({ queryKey: ['chat', 'sessions'] })
+    },
   })
 }
 

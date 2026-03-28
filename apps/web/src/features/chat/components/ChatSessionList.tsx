@@ -1,3 +1,13 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { useCreateSession, useDeleteSession, useRenameSession } from '@/features/chat/api/chat.api'
 import { cn } from '@/lib/utils'
@@ -17,6 +27,7 @@ export function ChatSessionList({ sessions, activeId, onSelect }: Props) {
   const renameSession = useRenameSession()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -31,10 +42,10 @@ export function ChatSessionList({ sessions, activeId, onSelect }: Props) {
     })
   }
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    if (!window.confirm('Удалить этот чат?')) return
-    deleteSession.mutate(id)
+  const handleDeleteConfirm = () => {
+    if (confirmDeleteId === null) return
+    deleteSession.mutate(confirmDeleteId)
+    setConfirmDeleteId(null)
   }
 
   const handleEditStart = (e: React.MouseEvent, session: ChatSession) => {
@@ -51,84 +62,104 @@ export function ChatSessionList({ sessions, activeId, onSelect }: Props) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-sm font-medium">Чаты</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={handleCreate}
-          disabled={createSession.isPending}
-          title="Новый чат"
-        >
-          <MessageSquarePlus className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="flex-1 overflow-auto p-1">
-        {sessions.length === 0 && (
-          <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-            Нет чатов. Создай первый!
-          </p>
-        )}
-
-        {sessions.map((s) => (
-          <div
-            key={s.id}
-            className={cn(
-              'group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm',
-              activeId === s.id
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            )}
+    <>
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b px-3 py-2">
+          <span className="text-sm font-medium">Чаты</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleCreate}
+            disabled={createSession.isPending}
+            title="Новый чат"
           >
-            {editingId === s.id ? (
-              <input
-                ref={editInputRef}
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                onBlur={() => handleEditCommit(s.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleEditCommit(s.id)
-                  if (e.key === 'Escape') setEditingId(null)
-                }}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <button
-                type="button"
-                className="min-w-0 flex-1 truncate text-left"
-                onClick={() => onSelect(s.id)}
-              >
-                {s.title}
-              </button>
-            )}
+            <MessageSquarePlus className="h-4 w-4" />
+          </Button>
+        </div>
 
-            <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={(e) => handleEditStart(e, s)}
-                title="Переименовать"
-              >
-                <Pencil className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-destructive hover:text-destructive"
-                onClick={(e) => handleDelete(e, s.id)}
-                title="Удалить"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
+        <div className="flex-1 overflow-auto p-1">
+          {sessions.length === 0 && (
+            <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+              Нет чатов. Создай первый!
+            </p>
+          )}
+
+          {sessions.map((s) => (
+            <div
+              key={s.id}
+              className={cn(
+                'group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm',
+                activeId === s.id
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              {editingId === s.id ? (
+                <input
+                  ref={editInputRef}
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onBlur={() => handleEditCommit(s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleEditCommit(s.id)
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 truncate text-left"
+                  onClick={() => onSelect(s.id)}
+                >
+                  {s.title}
+                </button>
+              )}
+
+              <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={(e) => handleEditStart(e, s)}
+                  title="Переименовать"
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setConfirmDeleteId(s.id)
+                  }}
+                  title="Удалить"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+
+      <AlertDialog open={confirmDeleteId !== null} onOpenChange={(open) => { if (!open) setConfirmDeleteId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить чат?</AlertDialogTitle>
+            <AlertDialogDescription>Это действие нельзя отменить.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
