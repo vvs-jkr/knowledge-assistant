@@ -9,7 +9,16 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . .
+# Cache dependency compilation -- this layer is reused when only src/ changes
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir -p src && echo 'fn main() {}' > src/main.rs && \
+    cargo build --release && \
+    rm -f src/main.rs target/release/deps/knowledge_api*
+
+# Build actual source
+COPY src ./src
+COPY .sqlx ./.sqlx
+COPY migrations ./migrations
 ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
