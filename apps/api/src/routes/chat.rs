@@ -13,7 +13,6 @@ use crate::{
     crypto,
     error::{ApiResult, AppError},
     middleware::AuthUser,
-    routes::workouts::format_workouts_compact,
     workouts::WorkoutAnalysis,
 };
 
@@ -382,16 +381,20 @@ async fn send_message(
 async fn build_training_context(state: &AppState, user_id: &str) -> ApiResult<String> {
     let mut parts: Vec<String> = Vec::new();
 
-    // Cached workout analysis.
-    let cached: Option<String> =
-        sqlx::query_scalar("SELECT analysis FROM workout_analysis_cache WHERE user_id = ?")
-            .bind(user_id)
-            .fetch_optional(&state.db)
-            .await
-            .map_err(AppError::from)?;
+    // Cached workout analysis + representative examples.
+    let cache_row = sqlx::query(
+        "SELECT analysis, workout_examples FROM workout_analysis_cache WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?;
 
-    if let Some(json) = cached {
-        if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&json) {
+    if let Some(row) = cache_row {
+        let analysis_json: String = row.try_get("analysis").map_err(AppError::from)?;
+        let examples: String = row.try_get("workout_examples").map_err(AppError::from)?;
+
+        if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&analysis_json) {
             parts.push(format!(
                 "## Анализ тренировок\n{}\n\nПаттерны: {}\nБаланс мышц: {}\nРекомендуемый фокус: {}",
                 analysis.summary,
@@ -400,12 +403,12 @@ async fn build_training_context(state: &AppState, user_id: &str) -> ApiResult<St
                 analysis.suggested_focus,
             ));
         }
-    }
 
-    // Recent workout examples (last 20) -- so AI can match style and format.
-    let recent_workouts = format_workouts_compact(&state.db, user_id, 50).await?;
-    if !recent_workouts.is_empty() {
-        parts.push(format!("## Примеры последних тренировок\n{recent_workouts}"));
+        if !examples.is_empty() {
+            parts.push(format!(
+                "## Примеры тренировок по типам (для генерации новых тренировок)\n{examples}"
+            ));
+        }
     }
 
     // Recent health metrics (last 30).

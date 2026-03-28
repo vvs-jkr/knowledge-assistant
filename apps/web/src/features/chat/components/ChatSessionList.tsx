@@ -33,6 +33,7 @@ export function ChatSessionList({ sessions, activeId, onSelect }: Props) {
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
+    if (!window.confirm('Удалить этот чат?')) return
     deleteSession.mutate(id)
   }
 

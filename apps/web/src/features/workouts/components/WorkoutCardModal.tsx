@@ -71,6 +71,29 @@ function ExerciseViewRow({ ex }: { ex: WorkoutExercise }) {
   )
 }
 
+function NumField({
+  value,
+  onChange,
+  label,
+}: {
+  value: string
+  onChange: (v: string) => void
+  label: string
+}) {
+  return (
+    <label className="flex items-center gap-1 text-xs text-muted-foreground">
+      <span className="w-8 shrink-0">{label}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/[^\d.]/g, ''))}
+        className="w-14 rounded border border-input bg-background px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+      />
+    </label>
+  )
+}
+
 function ExerciseEditRow({
   draft,
   onChange,
@@ -79,37 +102,13 @@ function ExerciseEditRow({
   onChange: (d: ExerciseDraft) => void
 }) {
   return (
-    <div className="flex flex-col gap-1 py-1.5">
-      <span className="text-sm font-medium">{draft.name}</span>
-      <div className="flex flex-wrap gap-1.5">
-        <Input
-          type="number"
-          value={draft.sets}
-          onChange={(e) => onChange({ ...draft, sets: e.target.value })}
-          placeholder="подх."
-          className="h-7 w-16 text-xs"
-        />
-        <Input
-          type="number"
-          value={draft.reps}
-          onChange={(e) => onChange({ ...draft, reps: e.target.value })}
-          placeholder="повт."
-          className="h-7 w-16 text-xs"
-        />
-        <Input
-          type="number"
-          value={draft.weight_kg}
-          onChange={(e) => onChange({ ...draft, weight_kg: e.target.value })}
-          placeholder="кг"
-          className="h-7 w-16 text-xs"
-        />
-        <Input
-          type="number"
-          value={draft.duration_secs}
-          onChange={(e) => onChange({ ...draft, duration_secs: e.target.value })}
-          placeholder="сек"
-          className="h-7 w-16 text-xs"
-        />
+    <div className="flex items-center gap-3 py-1">
+      <span className="min-w-0 flex-1 text-sm font-medium">{draft.name}</span>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        <NumField label="подх." value={draft.sets} onChange={(v) => onChange({ ...draft, sets: v })} />
+        <NumField label="повт." value={draft.reps} onChange={(v) => onChange({ ...draft, reps: v })} />
+        <NumField label="кг" value={draft.weight_kg} onChange={(v) => onChange({ ...draft, weight_kg: v })} />
+        <NumField label="сек" value={draft.duration_secs} onChange={(v) => onChange({ ...draft, duration_secs: v })} />
       </div>
     </div>
   )
@@ -261,7 +260,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
               ) : (
                 <>
                   <span>{workout.date}</span>
-                  <Badge variant="secondary">{workout.workout_type}</Badge>
+                  <Badge variant="secondary">{WORKOUT_TYPE_LABELS[workout.workout_type] ?? workout.workout_type}</Badge>
                   {workout.duration_mins !== null && <span>{workout.duration_mins} мин</span>}
                   {workout.rounds !== null && <span>{workout.rounds} раундов</span>}
                 </>

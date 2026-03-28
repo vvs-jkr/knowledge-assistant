@@ -867,6 +867,95 @@ pub async fn format_workouts_compact(
 }
 
 // ---------------------------------------------------------------------------
+// Build representative workout examples for chat context cache
+// ---------------------------------------------------------------------------
+
+/// Selects up to 3 workouts per type with full exercise details.
+/// Result is stored in `workout_analysis_cache.workout_examples` and injected
+/// into the chat system prompt so the AI can match style without re-querying.
+async fn build_workout_examples(db: &sqlx::SqlitePool, user_id: &str) -> ApiResult<String> {
+    let types = ["for_time", "amrap", "emom", "tabata", "lifting", "rounds", "other"];
+    let mut sections: Vec<String> = Vec::new();
+
+    for wtype in types {
+        let rows = sqlx::query(
+            "SELECT id, date, name, duration_mins, rounds FROM workouts \
+             WHERE user_id = ? AND workout_type = ? \
+             AND id IN (SELECT id FROM workouts WHERE user_id = ? AND workout_type = ? \
+                        ORDER BY RANDOM() LIMIT 3)",
+        )
+        .bind(user_id)
+        .bind(wtype)
+        .bind(user_id)
+        .bind(wtype)
+        .fetch_all(db)
+        .await
+        .map_err(AppError::from)?;
+
+        if rows.is_empty() {
+            continue;
+        }
+
+        let mut type_lines: Vec<String> = Vec::new();
+        for row in &rows {
+            let wid: String = row.try_get("id").map_err(AppError::from)?;
+            let date: String = row.try_get("date").map_err(AppError::from)?;
+            let name: String = row.try_get("name").map_err(AppError::from)?;
+            let duration: Option<i64> = row.try_get("duration_mins").map_err(AppError::from)?;
+            let rounds: Option<i64> = row.try_get("rounds").map_err(AppError::from)?;
+
+            let ex_rows = sqlx::query(
+                "SELECT e.name, we.sets, we.reps, we.weight_kg, we.weight_note, we.duration_secs \
+                 FROM workout_exercises we \
+                 JOIN exercises e ON e.id = we.exercise_id \
+                 WHERE we.workout_id = ? ORDER BY we.order_index ASC",
+            )
+            .bind(&wid)
+            .fetch_all(db)
+            .await
+            .map_err(AppError::from)?;
+
+            let mut ex_parts: Vec<String> = Vec::new();
+            for ex in &ex_rows {
+                let ex_name: String = ex.try_get("name").map_err(AppError::from)?;
+                let sets: Option<i64> = ex.try_get("sets").map_err(AppError::from)?;
+                let reps: Option<i64> = ex.try_get("reps").map_err(AppError::from)?;
+                let weight: Option<f64> = ex.try_get("weight_kg").map_err(AppError::from)?;
+                let weight_note: Option<String> = ex.try_get("weight_note").map_err(AppError::from)?;
+                let dur_secs: Option<i64> = ex.try_get("duration_secs").map_err(AppError::from)?;
+
+                let detail = match (sets, reps, weight) {
+                    (Some(s), Some(r), Some(w)) => format!("{ex_name} {s}x{r} @{w}kg"),
+                    (Some(s), Some(r), None) => match weight_note {
+                        Some(wn) => format!("{ex_name} {s}x{r} {wn}"),
+                        None => format!("{ex_name} {s}x{r}"),
+                    },
+                    (None, Some(r), None) => format!("{ex_name} x{r}"),
+                    _ => match dur_secs {
+                        Some(d) => format!("{ex_name} {d}s"),
+                        None => ex_name,
+                    },
+                };
+                ex_parts.push(detail);
+            }
+
+            let mut meta = String::new();
+            if let Some(d) = duration { meta.push_str(&format!(" {d}min")); }
+            if let Some(r) = rounds { meta.push_str(&format!(" {r}rounds")); }
+
+            type_lines.push(format!(
+                "  [{date}] {name}{meta}\n    {}",
+                ex_parts.join(" / ")
+            ));
+        }
+
+        sections.push(format!("[{wtype}]\n{}", type_lines.join("\n")));
+    }
+
+    Ok(sections.join("\n\n"))
+}
+
+// ---------------------------------------------------------------------------
 // POST /workouts/generate
 // ---------------------------------------------------------------------------
 
@@ -1145,6 +1234,9 @@ async fn analyze_workouts_handler(
     )
     .await?;
 
+    // --- Build representative workout examples for chat context ---
+    let workout_examples = build_workout_examples(&state.db, user_id).await?;
+
     // --- Save result to cache ---
     let analysis_json = serde_json::to_string(&analysis)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize analysis: {e}")))?;
@@ -1153,12 +1245,13 @@ async fn analyze_workouts_handler(
 
     sqlx::query(
         "INSERT OR REPLACE INTO workout_analysis_cache \
-         (id, user_id, analysis, workout_count, last_workout_date, created_at) \
-         VALUES (?, ?, ?, ?, ?, ?)",
+         (id, user_id, analysis, workout_examples, workout_count, last_workout_date, created_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&cache_id)
     .bind(user_id)
     .bind(&analysis_json)
+    .bind(&workout_examples)
     .bind(total_workouts)
     .bind(&last_date)
     .bind(&now)
