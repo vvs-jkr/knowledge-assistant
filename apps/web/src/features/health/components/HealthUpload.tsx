@@ -14,6 +14,8 @@ export function HealthUpload() {
   const [labName, setLabName] = useState('')
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
+  const isCSV = pendingFile?.name.toLowerCase().endsWith('.csv') ?? false
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
     if (file) setPendingFile(file)
@@ -21,7 +23,11 @@ export function HealthUpload() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/pdf': ['.pdf'] },
+    accept: {
+      'application/pdf': ['.pdf'],
+      'text/csv': ['.csv'],
+      'application/vnd.ms-excel': ['.csv'],
+    },
     maxFiles: 1,
     disabled: upload.isPending,
   })
@@ -29,7 +35,11 @@ export function HealthUpload() {
   const handleSubmit = () => {
     if (!pendingFile) return
     upload.mutate(
-      { file: pendingFile, labDate, ...(labName ? { labName } : {}) },
+      {
+        file: pendingFile,
+        ...(isCSV ? {} : { labDate }),
+        ...(labName ? { labName } : {}),
+      },
       {
         onSuccess: (data) => {
           toast.success(`Uploaded: ${data.metrics.length} metric(s) extracted`)
@@ -63,46 +73,56 @@ export function HealthUpload() {
         {pendingFile ? (
           <span className="font-medium text-foreground">{pendingFile.name}</span>
         ) : isDragActive ? (
-          <span>Drop PDF here</span>
+          <span>Drop file here</span>
         ) : (
-          <span>Drop PDF or click</span>
+          <span>Drop PDF or InBody CSV</span>
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="lab-date" className="text-xs">
-          Lab date
-        </Label>
-        <Input
-          id="lab-date"
-          type="date"
-          value={labDate}
-          onChange={(e) => setLabDate(e.target.value)}
-          className="h-8 text-sm"
-        />
-      </div>
+      {!isCSV && (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor="lab-date" className="text-xs">
+              Lab date
+            </Label>
+            <Input
+              id="lab-date"
+              type="date"
+              value={labDate}
+              onChange={(e) => setLabDate(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="lab-name" className="text-xs">
-          Lab name (optional)
-        </Label>
-        <Input
-          id="lab-name"
-          type="text"
-          placeholder="e.g. City Lab"
-          value={labName}
-          onChange={(e) => setLabName(e.target.value)}
-          className="h-8 text-sm"
-        />
-      </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="lab-name" className="text-xs">
+              Lab name (optional)
+            </Label>
+            <Input
+              id="lab-name"
+              type="text"
+              placeholder="e.g. City Lab"
+              value={labName}
+              onChange={(e) => setLabName(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+        </>
+      )}
+
+      {isCSV && (
+        <p className="text-xs text-muted-foreground">
+          Date and device are read automatically from the CSV.
+        </p>
+      )}
 
       <Button
         size="sm"
         className="w-full"
         onClick={handleSubmit}
-        disabled={!pendingFile || !labDate || upload.isPending}
+        disabled={!pendingFile || (!isCSV && !labDate) || upload.isPending}
       >
-        {upload.isPending ? 'Analyzing…' : 'Upload & Extract'}
+        {upload.isPending ? 'Uploading...' : isCSV ? 'Upload CSV' : 'Upload & Extract'}
       </Button>
     </div>
   )

@@ -12,10 +12,10 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 const healthApi = {
-  upload: (file: File, labDate: string, labName?: string) => {
+  upload: (file: File, labDate?: string, labName?: string) => {
     const form = new FormData()
     form.append('file', file)
-    form.append('lab_date', labDate)
+    if (labDate) form.append('lab_date', labDate)
     if (labName) form.append('lab_name', labName)
     return api
       .post<UploadHealthResponse>('/health/upload', form)
@@ -63,7 +63,7 @@ export function useUploadHealth() {
       labName,
     }: {
       file: File
-      labDate: string
+      labDate?: string
       labName?: string
     }) => healthApi.upload(file, labDate, labName),
     onSuccess: () => {

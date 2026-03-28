@@ -13,12 +13,15 @@ use crate::{
     config::AppState,
     crypto,
     error::{ApiResult, AppError},
-    health::{HealthMetric, HealthRecordMeta, MetricValue, UploadHealthResponse, KNOWN_METRICS},
+    health::{
+        parse_inbody_csv, HealthMetric, HealthRecordMeta, MetricValue, UploadHealthResponse,
+        INBODY_METRICS, KNOWN_METRICS,
+    },
     middleware::AuthUser,
 };
 
-/// Maximum accepted file size for a PDF upload: 20 MiB.
-const MAX_PDF_SIZE: usize = 20 * 1024 * 1024;
+/// Maximum accepted file size for an upload: 20 MiB.
+const MAX_FILE_SIZE: usize = 20 * 1024 * 1024;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -27,7 +30,7 @@ pub fn router() -> Router<AppState> {
         .route("/health/records/:id", delete(delete_record))
         .route("/health/metrics", get(list_metrics))
         .route("/health/export", get(export_health))
-        .layer(DefaultBodyLimit::max(MAX_PDF_SIZE))
+        .layer(DefaultBodyLimit::max(MAX_FILE_SIZE))
 }
 
 // ---------------------------------------------------------------------------
@@ -40,16 +43,10 @@ async fn upload_health(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> ApiResult<(StatusCode, Json<UploadHealthResponse>)> {
-    if state.anthropic_api_key.is_empty() {
-        return Err(AppError::BadRequest(
-            "Anthropic API key not configured".into(),
-        ));
-    }
-
-    let mut pdf_bytes: Option<Vec<u8>> = None;
-    let mut pdf_filename: Option<String> = None;
-    let mut lab_date: Option<String> = None;
-    let mut lab_name: Option<String> = None;
+    let mut file_bytes: Option<Vec<u8>> = None;
+    let mut file_name: Option<String> = None;
+    let mut lab_date_field: Option<String> = None;
+    let mut lab_name_field: Option<String> = None;
 
     while let Some(field) = multipart
         .next_field()
@@ -70,66 +67,84 @@ async fn upload_health(
                     .and_then(|e| e.to_str())
                     .unwrap_or("")
                     .to_ascii_lowercase();
-                if ext != "pdf" {
+                if ext != "pdf" && ext != "csv" {
                     return Err(AppError::BadRequest(format!(
-                        "Only PDF files allowed, got: {filename}"
+                        "Only PDF or CSV files are accepted, got: {filename}"
                     )));
                 }
 
                 let data = field
                     .bytes()
                     .await
-                    .map_err(|e| AppError::BadRequest(format!("failed to read PDF: {e}")))?;
+                    .map_err(|e| AppError::BadRequest(format!("failed to read file: {e}")))?;
 
-                if data.len() > MAX_PDF_SIZE {
+                if data.len() > MAX_FILE_SIZE {
                     return Err(AppError::PayloadTooLarge);
                 }
 
-                pdf_filename = Some(filename);
-                pdf_bytes = Some(data.to_vec());
+                file_name = Some(filename);
+                file_bytes = Some(data.to_vec());
             }
             "lab_date" => {
-                lab_date =
-                    Some(field.text().await.map_err(|e| {
-                        AppError::BadRequest(format!("failed to read lab_date: {e}"))
-                    })?);
+                lab_date_field = Some(field.text().await.map_err(|e| {
+                    AppError::BadRequest(format!("failed to read lab_date: {e}"))
+                })?);
             }
             "lab_name" => {
-                lab_name =
-                    Some(field.text().await.map_err(|e| {
-                        AppError::BadRequest(format!("failed to read lab_name: {e}"))
-                    })?);
+                lab_name_field = Some(field.text().await.map_err(|e| {
+                    AppError::BadRequest(format!("failed to read lab_name: {e}"))
+                })?);
             }
             _ => {
-                // consume unknown fields to avoid multipart errors
                 let _ = field.bytes().await;
             }
         }
     }
 
-    let pdf_bytes = pdf_bytes.ok_or_else(|| AppError::BadRequest("No PDF file provided".into()))?;
-    let pdf_filename = pdf_filename.expect("set when pdf_bytes is Some");
-    let lab_date =
-        lab_date.ok_or_else(|| AppError::BadRequest("lab_date field is required".into()))?;
-    let lab_name = lab_name.unwrap_or_default();
+    let file_bytes =
+        file_bytes.ok_or_else(|| AppError::BadRequest("No file provided".into()))?;
+    let file_name = file_name.expect("set when file_bytes is Some");
 
-    // Base64-encode the PDF for the Anthropic Messages API.
-    let pdf_base64 = STANDARD.encode(&pdf_bytes);
+    let file_ext = std::path::Path::new(&file_name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
 
-    // Call Claude to extract metrics (synchronous — the result drives the response).
-    let extraction = ai::extract_lab_metrics(
-        &state.http_client,
-        &state.anthropic_api_key,
-        &state.anthropic_model,
-        &pdf_base64,
-        &pdf_filename,
-    )
-    .await?;
+    // Branch: InBody CSV is parsed locally; lab PDFs are sent to Claude.
+    let allowed_metrics: &[&str];
+    let (extraction, lab_date, lab_name) = if file_ext == "csv" {
+        let parsed = parse_inbody_csv(&file_bytes)?;
+        let date = lab_date_field.unwrap_or_else(|| parsed.lab_date.clone());
+        let name = lab_name_field.unwrap_or_else(|| parsed.lab_name.clone());
+        allowed_metrics = INBODY_METRICS;
+        (parsed, date, name)
+    } else {
+        if state.anthropic_api_key.is_empty() {
+            return Err(AppError::BadRequest(
+                "Anthropic API key not configured".into(),
+            ));
+        }
+        let date = lab_date_field
+            .ok_or_else(|| AppError::BadRequest("lab_date is required for PDF upload".into()))?;
+        let name = lab_name_field.unwrap_or_default();
+        let pdf_base64 = STANDARD.encode(&file_bytes);
+        let extraction = ai::extract_lab_metrics(
+            &state.http_client,
+            &state.anthropic_api_key,
+            &state.anthropic_model,
+            &pdf_base64,
+            &file_name,
+        )
+        .await?;
+        allowed_metrics = KNOWN_METRICS;
+        (extraction, date, name)
+    };
 
-    // Encrypt and persist the PDF.
-    let size_bytes = i64::try_from(pdf_bytes.len())
+    // Encrypt and persist the uploaded file.
+    let size_bytes = i64::try_from(file_bytes.len())
         .map_err(|e| AppError::Internal(anyhow::anyhow!("size overflow: {e}")))?;
-    let (encrypted_pdf, pdf_nonce) = crypto::encrypt(&state.encryption_key, &pdf_bytes)?;
+    let (encrypted_pdf, pdf_nonce) = crypto::encrypt(&state.encryption_key, &file_bytes)?;
 
     let record_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
     let user_id = &claims.sub;
@@ -143,7 +158,7 @@ async fn upload_health(
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         record_id,
         user_id,
-        pdf_filename,
+        file_name,
         lab_date,
         lab_name,
         encrypted_pdf,
@@ -160,7 +175,7 @@ async fn upload_health(
     let mut metrics: Vec<HealthMetric> = Vec::new();
 
     for extracted in &extraction.metrics {
-        if !KNOWN_METRICS.contains(&extracted.metric_name.as_str()) {
+        if !allowed_metrics.contains(&extracted.metric_name.as_str()) {
             continue;
         }
 
@@ -214,7 +229,7 @@ async fn upload_health(
 
     let record = HealthRecordMeta {
         id: record_id,
-        filename: pdf_filename,
+        filename: file_name,
         lab_date,
         lab_name,
         pdf_size_bytes: size_bytes,
@@ -411,10 +426,10 @@ fn build_markdown(metrics: &[HealthMetric]) -> String {
         md.push_str("|--------|-------|------|-----------|--------|\n");
         for m in date_metrics {
             let reference = match (m.reference_min, m.reference_max) {
-                (Some(min), Some(max)) => format!("{min} – {max}"),
+                (Some(min), Some(max)) => format!("{min} - {max}"),
                 (Some(min), None) => format!("> {min}"),
                 (None, Some(max)) => format!("< {max}"),
-                (None, None) => "—".into(),
+                (None, None) => "--".into(),
             };
             let _ = writeln!(
                 md,

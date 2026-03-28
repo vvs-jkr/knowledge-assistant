@@ -11,7 +11,12 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAnalyzeNote, useImproveNote, useNote, useUpdateNote } from '@/features/notes/api/notes.api'
+import {
+  useAnalyzeNote,
+  useImproveNote,
+  useNote,
+  useUpdateNote,
+} from '@/features/notes/api/notes.api'
 import { useNotesStore } from '@/features/notes/store/notes.store'
 import type { NoteAnalysis } from '@/shared/schemas/notes.schema'
 import axios from 'axios'
@@ -59,7 +64,7 @@ export function NoteAnalysisDialog({ noteId }: NoteAnalysisDialogProps) {
     const updated = applyTagsToContent(content, tags)
     updateNote.mutate(
       { id: noteId, body: { content: updated } },
-      { onSuccess: () => toast.success('Теги применены') },
+      { onSuccess: () => toast.success('Теги применены') }
     )
   }
 
@@ -153,7 +158,12 @@ interface AnalysisResultProps {
   applyingTags: boolean
 }
 
-function AnalysisResult({ analysis, onSelectNote, onApplyTags, applyingTags }: AnalysisResultProps) {
+function AnalysisResult({
+  analysis,
+  onSelectNote,
+  onApplyTags,
+  applyingTags,
+}: AnalysisResultProps) {
   const scoreColor =
     analysis.quality_score >= 8
       ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
