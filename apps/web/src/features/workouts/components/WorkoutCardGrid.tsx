@@ -10,26 +10,39 @@ import { useState } from 'react'
 
 const PAGE_SIZE = 24
 
+const TYPE_COLORS: Record<string, string> = {
+  for_time: 'border-l-blue-500',
+  amrap: 'border-l-green-500',
+  emom: 'border-l-purple-500',
+  tabata: 'border-l-orange-500',
+  lifting: 'border-l-red-500',
+  rounds: 'border-l-cyan-500',
+  other: 'border-l-zinc-400',
+}
+
 function WorkoutCard({ workout, onClick }: { workout: WorkoutSummary; onClick: () => void }) {
+  const accentColor = TYPE_COLORS[workout.workout_type] ?? 'border-l-zinc-400'
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-2 rounded-xl bg-muted/40 p-4 text-left transition-colors hover:bg-muted/70 active:bg-muted"
+      className={`flex flex-col gap-2 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:shadow-md hover:border-foreground/20 border-l-4 ${accentColor}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-xs text-muted-foreground">{workout.date}</span>
-        <Badge variant="secondary" className="shrink-0 text-xs">
+        <span className="text-xs font-medium text-muted-foreground">{workout.date}</span>
+        <Badge variant="outline" className="shrink-0 text-xs">
           {workout.workout_type}
         </Badge>
       </div>
 
-      <p className="line-clamp-2 text-sm font-medium leading-snug">{workout.name}</p>
+      <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+        {workout.name}
+      </p>
 
       <div className="mt-auto flex items-center gap-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
           <Dumbbell className="h-3 w-3" />
-          {workout.exercise_count}
+          <span>{workout.exercise_count}</span>
         </span>
         {workout.duration_mins !== null && <span>{workout.duration_mins} мин</span>}
         {workout.rounds !== null && <span>{workout.rounds} р.</span>}
@@ -73,8 +86,8 @@ export function WorkoutCardGrid() {
   const pageItems = workouts.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
-    <div className="flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto p-4">
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1 overflow-auto p-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {pageItems.map((w) => (
             <WorkoutCard key={w.id} workout={w} onClick={() => setSelectedId(w.id)} />

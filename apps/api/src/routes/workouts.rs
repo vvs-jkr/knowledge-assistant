@@ -1073,10 +1073,11 @@ async fn analyze_workouts_handler(
         let cached_date: String = row.try_get("last_workout_date").map_err(AppError::from)?;
         if cached_count == total_workouts && cached_date == last_date {
             let cached_json: String = row.try_get("analysis").map_err(AppError::from)?;
-            let analysis = serde_json::from_str::<WorkoutAnalysis>(&cached_json).map_err(|e| {
-                AppError::Internal(anyhow::anyhow!("deserialize cached analysis: {e}"))
-            })?;
-            return Ok(Json(analysis));
+            if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&cached_json) {
+                return Ok(Json(analysis));
+            }
+            // Cache JSON is stale/malformed -- fall through to regenerate.
+            tracing::warn!("workout_analysis_cache deserialization failed -- regenerating");
         }
     }
 

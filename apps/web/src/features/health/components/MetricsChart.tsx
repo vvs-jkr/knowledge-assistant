@@ -11,20 +11,47 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type { TooltipProps } from 'recharts'
 
-const METRIC_LABELS: Record<string, string> = {
-  glucose: 'Глюкоза (Glucose, mmol/L)',
-  cholesterol_total: 'Холестерин общий (Total Cholesterol, mmol/L)',
-  cholesterol_hdl: 'Холестерин ЛПВП (HDL, mmol/L)',
-  cholesterol_ldl: 'Холестерин ЛПНП (LDL, mmol/L)',
-  hemoglobin: 'Гемоглобин (Hgb, g/L)',
-  platelets: 'Тромбоциты (PLT, x10⁹/L)',
-  leukocytes: 'Лейкоциты (WBC, x10⁹/L)',
-  erythrocytes: 'Эритроциты (RBC, x10¹²/L)',
-  esr: 'СОЭ (ESR, mm/h)',
-  creatinine: 'Креатинин (Creatinine, μmol/L)',
-  alt: 'АЛТ (ALT, U/L)',
-  ast: 'АСТ (AST, U/L)',
+interface MetricInfo {
+  en: string
+  ru: string
+  unit: string
+}
+
+const METRIC_INFO: Record<string, MetricInfo> = {
+  glucose: { en: 'Glucose', ru: 'Глюкоза', unit: 'mmol/L' },
+  cholesterol_total: { en: 'Total Cholesterol', ru: 'Холестерин общий', unit: 'mmol/L' },
+  cholesterol_hdl: { en: 'HDL Cholesterol', ru: 'Холестерин ЛПВП', unit: 'mmol/L' },
+  cholesterol_ldl: { en: 'LDL Cholesterol', ru: 'Холестерин ЛПНП', unit: 'mmol/L' },
+  hemoglobin: { en: 'Hemoglobin (Hgb)', ru: 'Гемоглобин', unit: 'g/L' },
+  platelets: { en: 'Platelets (PLT)', ru: 'Тромбоциты', unit: 'x10⁹/L' },
+  leukocytes: { en: 'WBC', ru: 'Лейкоциты', unit: 'x10⁹/L' },
+  erythrocytes: { en: 'RBC', ru: 'Эритроциты', unit: 'x10¹²/L' },
+  esr: { en: 'ESR', ru: 'СОЭ (скорость оседания эритроцитов)', unit: 'mm/h' },
+  creatinine: { en: 'Creatinine', ru: 'Креатинин', unit: 'μmol/L' },
+  alt: { en: 'ALT', ru: 'АЛТ (аланинаминотрансфераза)', unit: 'U/L' },
+  ast: { en: 'AST', ru: 'АСТ (аспартатаминотрансфераза)', unit: 'U/L' },
+  bmr: { en: 'BMR', ru: 'Базальный метаболизм', unit: 'kcal' },
+  bmi: { en: 'BMI', ru: 'Индекс массы тела (ИМТ)', unit: '' },
+  weight: { en: 'Weight', ru: 'Масса тела', unit: 'kg' },
+}
+
+function getInfo(metricName: string): MetricInfo {
+  return METRIC_INFO[metricName] ?? { en: metricName, ru: metricName, unit: '' }
+}
+
+function ChartTooltip({ active, payload, label, unit, ru }: TooltipProps<number, string> & { unit: string; ru: string }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-md border border-border bg-background px-3 py-2 text-xs shadow-md">
+      <p className="font-medium text-foreground">{ru}</p>
+      <p className="text-muted-foreground">{label}</p>
+      <p className="text-foreground">
+        {payload[0]?.value} {unit}
+      </p>
+    </div>
+  )
 }
 
 interface MetricsChartProps {
@@ -45,12 +72,11 @@ export function MetricsChart({ params }: MetricsChartProps) {
   if (!metrics?.length) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No metrics to chart
+        Нет данных для графиков
       </div>
     )
   }
 
-  // Group by metric_name
   const byMetric = new Map<string, typeof metrics>()
   for (const m of metrics) {
     const arr = byMetric.get(m.metric_name) ?? []
@@ -58,27 +84,30 @@ export function MetricsChart({ params }: MetricsChartProps) {
     byMetric.set(m.metric_name, arr)
   }
 
-  const metricNames = [...byMetric.keys()]
-
   return (
     <div className="space-y-8 p-4">
-      {metricNames.map((name) => {
+      {[...byMetric.keys()].map((name) => {
         const data = byMetric.get(name) ?? []
-        const label = METRIC_LABELS[name] ?? name
+        const info = getInfo(name)
         const refMin = data[0]?.reference_min ?? null
         const refMax = data[0]?.reference_max ?? null
-
         const chartData = data.map((m) => ({ date: m.recorded_date, value: m.value }))
+        const heading = info.unit ? `${info.en} (${info.unit})` : info.en
 
         return (
           <div key={name}>
-            <p className="mb-2 text-sm font-medium">{label}</p>
+            <p
+              title={info.ru}
+              className="mb-2 cursor-help text-sm font-medium underline decoration-dotted decoration-muted-foreground underline-offset-2"
+            >
+              {heading}
+            </p>
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} width={48} />
-                <Tooltip />
+                <Tooltip content={<ChartTooltip unit={info.unit} ru={info.ru} />} />
                 {refMin !== null && (
                   <ReferenceLine
                     y={refMin}

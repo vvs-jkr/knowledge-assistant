@@ -32,12 +32,23 @@ type ExerciseInput = {
   notes?: string
 }
 
+type UpdateExerciseInput = {
+  exercise_id?: string
+  reps?: number
+  sets?: number
+  weight_kg?: number
+  weight_note?: string
+  duration_secs?: number
+  order_index?: number
+}
+
 type UpdateWorkoutInput = {
   date?: string
   name?: string
   workout_type?: string
   duration_mins?: number | null
   rounds?: number | null
+  exercises?: UpdateExerciseInput[]
 }
 
 type CreateWorkoutInput = {

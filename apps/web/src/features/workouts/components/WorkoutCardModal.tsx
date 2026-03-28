@@ -4,8 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useUpdateWorkout, useWorkout } from '@/features/workouts/api/workouts.api'
-import { WorkoutExerciseList } from '@/features/workouts/components/WorkoutExerciseList'
-import type { WorkoutType } from '@/shared/schemas/workouts.schema'
+import type { WorkoutExercise, WorkoutType } from '@/shared/schemas/workouts.schema'
 import { Pencil, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -29,6 +28,93 @@ const WORKOUT_TYPES: WorkoutType[] = [
   'other',
 ]
 
+interface ExerciseDraft {
+  exercise_id: string
+  name: string
+  reps: string
+  sets: string
+  weight_kg: string
+  weight_note: string
+  duration_secs: string
+  order_index: number
+}
+
+function toExerciseDraft(ex: WorkoutExercise): ExerciseDraft {
+  return {
+    exercise_id: ex.exercise_id,
+    name: ex.exercise_name,
+    reps: ex.reps !== null ? String(ex.reps) : '',
+    sets: ex.sets !== null ? String(ex.sets) : '',
+    weight_kg: ex.weight_kg !== null ? String(ex.weight_kg) : '',
+    weight_note: ex.weight_note ?? '',
+    duration_secs: ex.duration_secs !== null ? String(ex.duration_secs) : '',
+    order_index: ex.order_index,
+  }
+}
+
+function ExerciseViewRow({ ex }: { ex: WorkoutExercise }) {
+  const parts: string[] = []
+  if (ex.sets !== null && ex.reps !== null) parts.push(`${ex.sets}x${ex.reps}`)
+  else if (ex.reps !== null) parts.push(`${ex.reps} повт.`)
+  else if (ex.sets !== null) parts.push(`${ex.sets} подх.`)
+  if (ex.weight_kg !== null) parts.push(`${ex.weight_kg} кг`)
+  if (ex.weight_note) parts.push(ex.weight_note)
+  if (ex.duration_secs !== null) parts.push(`${ex.duration_secs}с`)
+
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <span className="text-sm font-medium">{ex.exercise_name}</span>
+      {parts.length > 0 && (
+        <span className="shrink-0 text-xs text-muted-foreground">{parts.join(' · ')}</span>
+      )}
+    </div>
+  )
+}
+
+function ExerciseEditRow({
+  draft,
+  onChange,
+}: {
+  draft: ExerciseDraft
+  onChange: (d: ExerciseDraft) => void
+}) {
+  return (
+    <div className="flex flex-col gap-1 py-1.5">
+      <span className="text-sm font-medium">{draft.name}</span>
+      <div className="flex flex-wrap gap-1.5">
+        <Input
+          type="number"
+          value={draft.sets}
+          onChange={(e) => onChange({ ...draft, sets: e.target.value })}
+          placeholder="подх."
+          className="h-7 w-16 text-xs"
+        />
+        <Input
+          type="number"
+          value={draft.reps}
+          onChange={(e) => onChange({ ...draft, reps: e.target.value })}
+          placeholder="повт."
+          className="h-7 w-16 text-xs"
+        />
+        <Input
+          type="number"
+          value={draft.weight_kg}
+          onChange={(e) => onChange({ ...draft, weight_kg: e.target.value })}
+          placeholder="кг"
+          className="h-7 w-16 text-xs"
+        />
+        <Input
+          type="number"
+          value={draft.duration_secs}
+          onChange={(e) => onChange({ ...draft, duration_secs: e.target.value })}
+          placeholder="сек"
+          className="h-7 w-16 text-xs"
+        />
+      </div>
+    </div>
+  )
+}
+
 interface WorkoutCardModalProps {
   workoutId: string | null
   onClose: () => void
@@ -43,6 +129,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
   const [workoutType, setWorkoutType] = useState<WorkoutType>('other')
   const [durationMins, setDurationMins] = useState('')
   const [rounds, setRounds] = useState('')
+  const [exerciseDrafts, setExerciseDrafts] = useState<ExerciseDraft[]>([])
 
   useEffect(() => {
     if (workout) {
@@ -51,6 +138,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
       setWorkoutType(workout.workout_type)
       setDurationMins(workout.duration_mins !== null ? String(workout.duration_mins) : '')
       setRounds(workout.rounds !== null ? String(workout.rounds) : '')
+      setExerciseDrafts(workout.exercises.map(toExerciseDraft))
     }
   }, [workout])
 
@@ -69,8 +157,17 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
         workout_type: workoutType,
         duration_mins: durationMins !== '' ? Number(durationMins) : null,
         rounds: rounds !== '' ? Number(rounds) : null,
+        exercises: exerciseDrafts.map((d) => ({
+          exercise_id: d.exercise_id,
+          ...(d.reps !== '' ? { reps: Number(d.reps) } : {}),
+          ...(d.sets !== '' ? { sets: Number(d.sets) } : {}),
+          ...(d.weight_kg !== '' ? { weight_kg: Number(d.weight_kg) } : {}),
+          ...(d.weight_note ? { weight_note: d.weight_note } : {}),
+          ...(d.duration_secs !== '' ? { duration_secs: Number(d.duration_secs) } : {}),
+          order_index: d.order_index,
+        })),
       },
-      { onSuccess: () => setEditing(false) }
+      { onSuccess: () => setEditing(false) },
     )
   }
 
@@ -81,6 +178,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
       setWorkoutType(workout.workout_type)
       setDurationMins(workout.duration_mins !== null ? String(workout.duration_mins) : '')
       setRounds(workout.rounds !== null ? String(workout.rounds) : '')
+      setExerciseDrafts(workout.exercises.map(toExerciseDraft))
     }
     setEditing(false)
   }
@@ -182,11 +280,31 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
               </div>
             )}
 
-            <div className="border-t pt-3">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="pt-1">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Упражнения
               </p>
-              <WorkoutExerciseList exercises={workout.exercises} />
+              {workout.exercises.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Нет упражнений</p>
+              ) : editing ? (
+                <div className="space-y-1">
+                  {exerciseDrafts.map((d, i) => (
+                    <ExerciseEditRow
+                      key={d.exercise_id}
+                      draft={d}
+                      onChange={(updated) =>
+                        setExerciseDrafts((prev) => prev.map((x, j) => (j === i ? updated : x)))
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {workout.exercises.map((ex) => (
+                    <ExerciseViewRow key={ex.id} ex={ex} />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
