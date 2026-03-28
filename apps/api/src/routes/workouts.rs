@@ -1149,7 +1149,7 @@ async fn analyze_workouts_handler(
     let last_date = last_workout_date.unwrap_or_default();
 
     let cache_row = sqlx::query(
-        "SELECT analysis, workout_count, last_workout_date \
+        "SELECT analysis, workout_examples, workout_count, last_workout_date \
          FROM workout_analysis_cache WHERE user_id = ?",
     )
     .bind(user_id)
@@ -1160,7 +1160,8 @@ async fn analyze_workouts_handler(
     if let Some(row) = cache_row {
         let cached_count: i64 = row.try_get("workout_count").map_err(AppError::from)?;
         let cached_date: String = row.try_get("last_workout_date").map_err(AppError::from)?;
-        if cached_count == total_workouts && cached_date == last_date {
+        let cached_examples: String = row.try_get("workout_examples").unwrap_or_default();
+        if cached_count == total_workouts && cached_date == last_date && !cached_examples.is_empty() {
             let cached_json: String = row.try_get("analysis").map_err(AppError::from)?;
             if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&cached_json) {
                 return Ok(Json(analysis));
