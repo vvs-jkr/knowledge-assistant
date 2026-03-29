@@ -323,9 +323,9 @@ async fn embed_all_workouts(
     AuthUser(claims): AuthUser,
     State(state): State<AppState>,
 ) -> ApiResult<Json<EmbedAllResponse>> {
-    if state.voyage_api_key.is_empty() {
+    if state.embedding_api_key.is_empty() {
         return Err(AppError::BadRequest(
-            "Embeddings not configured (missing VOYAGE_API_KEY)".into(),
+            "Embeddings not configured (missing OPENROUTER_API_KEY)".into(),
         ));
     }
 
@@ -384,7 +384,7 @@ async fn embed_all_workouts(
         let texts: Vec<&str> = chunk.iter().map(|(_, t)| t.as_str()).collect();
         let embeddings_batch = embeddings::generate_embeddings_batch(
             &state.http_client,
-            &state.voyage_api_key,
+            &state.embedding_api_key,
             &texts,
         )
         .await?;
@@ -761,12 +761,12 @@ fn build_workout_text(
 
 /// Spawns a background task to (re-)embed a single workout after create/update.
 fn spawn_workout_embedding(state: &AppState, workout_id: String) {
-    if state.voyage_api_key.is_empty() {
+    if state.embedding_api_key.is_empty() {
         return;
     }
     let db = state.db.clone();
     let http = state.http_client.clone();
-    let key = state.voyage_api_key.clone();
+    let key = state.embedding_api_key.clone();
     tokio::spawn(async move {
         // Fetch workout row + exercises for text.
         let row = sqlx::query(
@@ -1248,13 +1248,13 @@ async fn build_rag_context(
     user_id: &str,
     prompt: &str,
 ) -> ApiResult<(String, Vec<String>)> {
-    if state.voyage_api_key.is_empty() {
+    if state.embedding_api_key.is_empty() {
         return Ok((String::new(), Vec::new()));
     }
 
     let query_embedding = match embeddings::generate_embedding(
         &state.http_client,
-        &state.voyage_api_key,
+        &state.embedding_api_key,
         prompt,
         "query",
     )

@@ -5,7 +5,7 @@ pub struct AppConfig {
     pub encryption_key: String,
     pub anthropic_api_key: String,
     pub anthropic_model: String,
-    pub voyage_api_key: String,
+    pub embedding_api_key: String,
     pub frontend_url: String,
     pub port: u16,
     pub cookie_secure: bool,
@@ -20,7 +20,7 @@ impl AppConfig {
             anthropic_api_key: require_env("ANTHROPIC_API_KEY")?,
             anthropic_model: std::env::var("ANTHROPIC_MODEL")
                 .unwrap_or_else(|_| "anthropic/claude-sonnet-4-5".into()),
-            voyage_api_key: std::env::var("VOYAGE_API_KEY").unwrap_or_default(),
+            embedding_api_key: std::env::var("OPENROUTER_API_KEY").unwrap_or_default(),
             frontend_url: std::env::var("FRONTEND_URL")
                 .unwrap_or_else(|_| "http://localhost:5173".into()),
             port: std::env::var("PORT")
@@ -37,7 +37,7 @@ fn require_env(key: &str) -> anyhow::Result<String> {
     std::env::var(key).map_err(|_| anyhow::anyhow!("Missing required env var: {key}"))
 }
 
-// Panics at startup if the env var is malformed — better than silently using a wrong key.
+// Panics at startup if the env var is malformed -- better than silently using a wrong key.
 fn decode_encryption_key(hex: &str) -> [u8; 32] {
     assert!(
         hex.len() == 64,
@@ -57,7 +57,7 @@ fn decode_encryption_key(hex: &str) -> [u8; 32] {
 }
 
 // ---------------------------------------------------------------------------
-// AppState — shared state for all route handlers
+// AppState -- shared state for all route handlers
 // ---------------------------------------------------------------------------
 
 #[derive(Clone)]
@@ -70,7 +70,7 @@ pub struct AppState {
     pub rate_limit_enabled: bool,
     pub anthropic_api_key: String,
     pub anthropic_model: String,
-    pub voyage_api_key: String,
+    pub embedding_api_key: String,
     pub http_client: reqwest::Client,
     pub cookie_secure: bool,
 }
@@ -88,7 +88,7 @@ impl AppState {
                 .unwrap_or(true),
             anthropic_api_key: config.anthropic_api_key.clone(),
             anthropic_model: config.anthropic_model.clone(),
-            voyage_api_key: config.voyage_api_key.clone(),
+            embedding_api_key: config.embedding_api_key.clone(),
             http_client: reqwest::Client::new(),
             cookie_secure: config.cookie_secure,
         }

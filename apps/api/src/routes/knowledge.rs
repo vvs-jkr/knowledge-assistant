@@ -108,7 +108,7 @@ async fn upload_knowledge(
         .await
         .map_err(AppError::from)?;
 
-        // Generate and store embedding — failure is non-fatal.
+        // Generate and store embedding -- failure is non-fatal.
         spawn_knowledge_embedding(&state, entry_id.clone(), content_str.to_owned());
 
         uploaded.push(KnowledgeEntry {
@@ -224,7 +224,7 @@ async fn delete_knowledge(
         return Err(AppError::NotFound);
     }
 
-    // Clean up embedding — failure is non-fatal.
+    // Clean up embedding -- failure is non-fatal.
     if let Err(e) = embeddings::delete_knowledge_embedding(&state.db, &id).await {
         tracing::warn!("Failed to delete knowledge embedding for {id}: {e}");
     }
@@ -237,16 +237,16 @@ async fn delete_knowledge(
 // ---------------------------------------------------------------------------
 
 /// Spawns a background task to generate and store an embedding for `entry_id`.
-/// Logs a warning on failure — never panics, never fails the calling request.
+/// Logs a warning on failure -- never panics, never fails the calling request.
 fn spawn_knowledge_embedding(state: &AppState, entry_id: String, content: String) {
-    if state.voyage_api_key.is_empty() {
+    if state.embedding_api_key.is_empty() {
         return;
     }
     let state = state.clone();
     tokio::spawn(async move {
         match embeddings::generate_embedding(
             &state.http_client,
-            &state.voyage_api_key,
+            &state.embedding_api_key,
             &content,
             "document",
         )

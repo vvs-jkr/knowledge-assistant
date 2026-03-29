@@ -426,10 +426,10 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
     }
 
     // KNN workout search: find examples most relevant to the user's query.
-    if !state.voyage_api_key.is_empty() && !query.is_empty() {
+    if !state.embedding_api_key.is_empty() && !query.is_empty() {
         match crate::embeddings::generate_embedding(
             &state.http_client,
-            &state.voyage_api_key,
+            &state.embedding_api_key,
             query,
             "query",
         )

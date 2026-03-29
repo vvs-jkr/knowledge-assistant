@@ -1,28 +1,26 @@
 use crate::error::{ApiResult, AppError};
 use serde::{Deserialize, Serialize};
 
-const VOYAGE_API_URL: &str = "https://api.voyageai.com/v1/embeddings";
-const VOYAGE_MODEL: &str = "voyage-3-lite";
+const OPENAI_API_URL: &str = "https://openrouter.ai/api/v1/embeddings";
+const OPENAI_MODEL: &str = "openai/text-embedding-3-small";
 const EMBEDDING_DIM: usize = 512;
-/// Max chars per chunk before splitting (~8K tokens for voyage-3-lite).
+/// Max chars per chunk before splitting.
 const MAX_CHUNK_CHARS: usize = 16_000;
 
 #[derive(Serialize)]
-struct VoyageRequest<'a> {
+struct EmbeddingRequest<'a> {
     input: Vec<&'a str>,
     model: &'a str,
-    input_type: &'a str,
-    output_dimension: usize,
-    truncation: bool,
+    dimensions: usize,
 }
 
 #[derive(Deserialize)]
-struct VoyageResponse {
-    data: Vec<VoyageEmbeddingItem>,
+struct EmbeddingResponse {
+    data: Vec<EmbeddingItem>,
 }
 
 #[derive(Deserialize)]
-struct VoyageEmbeddingItem {
+struct EmbeddingItem {
     embedding: Vec<f32>,
     #[allow(dead_code)]
     index: usize,
@@ -31,53 +29,52 @@ struct VoyageEmbeddingItem {
 /// Generates a single embedding vector for `content`.
 /// Long content is split into paragraphs; resulting embeddings are averaged.
 ///
-/// `input_type` should be `"document"` for note content, `"query"` for search queries.
+/// The `input_type` parameter is accepted for API compatibility but ignored
+/// (OpenAI does not distinguish document vs query embeddings).
 pub async fn generate_embedding(
     http_client: &reqwest::Client,
-    voyage_api_key: &str,
+    api_key: &str,
     content: &str,
-    input_type: &str,
+    _input_type: &str,
 ) -> ApiResult<Vec<f32>> {
     let chunks = chunk_content(content);
     let chunk_refs: Vec<&str> = chunks.iter().map(String::as_str).collect();
 
-    let request = VoyageRequest {
+    let request = EmbeddingRequest {
         input: chunk_refs,
-        model: VOYAGE_MODEL,
-        input_type,
-        output_dimension: EMBEDDING_DIM,
-        truncation: true,
+        model: OPENAI_MODEL,
+        dimensions: EMBEDDING_DIM,
     };
 
     let response = http_client
-        .post(VOYAGE_API_URL)
-        .header("Authorization", format!("Bearer {voyage_api_key}"))
+        .post(OPENAI_API_URL)
+        .header("Authorization", format!("Bearer {api_key}"))
         .json(&request)
         .send()
         .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Voyage API request failed: {e}")))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("OpenAI API request failed: {e}")))?;
 
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         return Err(AppError::Internal(anyhow::anyhow!(
-            "Voyage API error {status}: {body}"
+            "OpenAI API error {status}: {body}"
         )));
     }
 
-    let voyage_resp: VoyageResponse = response
+    let resp: EmbeddingResponse = response
         .json()
         .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Voyage API parse error: {e}")))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("OpenAI API parse error: {e}")))?;
 
-    if voyage_resp.data.is_empty() {
+    if resp.data.is_empty() {
         return Err(AppError::Internal(anyhow::anyhow!(
-            "Voyage API returned no embeddings"
+            "OpenAI API returned no embeddings"
         )));
     }
 
-    if voyage_resp.data.len() == 1 {
-        return Ok(voyage_resp
+    if resp.data.len() == 1 {
+        return Ok(resp
             .data
             .into_iter()
             .next()
@@ -85,7 +82,7 @@ pub async fn generate_embedding(
             .embedding);
     }
 
-    Ok(average_embeddings(&voyage_resp.data))
+    Ok(average_embeddings(&resp.data))
 }
 
 /// Generates embeddings for a batch of texts in a single Voyage AI request.
@@ -94,46 +91,44 @@ pub async fn generate_embedding(
 ///
 /// # Errors
 ///
-/// Returns `AppError::Internal` if the Voyage AI request fails or the response is malformed.
+/// Returns `AppError::Internal` if the OpenAI request fails or the response is malformed.
 pub async fn generate_embeddings_batch(
     http_client: &reqwest::Client,
-    voyage_api_key: &str,
+    api_key: &str,
     texts: &[&str],
 ) -> ApiResult<Vec<Vec<f32>>> {
     if texts.is_empty() {
         return Ok(vec![]);
     }
 
-    let request = VoyageRequest {
+    let request = EmbeddingRequest {
         input: texts.to_vec(),
-        model: VOYAGE_MODEL,
-        input_type: "document",
-        output_dimension: EMBEDDING_DIM,
-        truncation: true,
+        model: OPENAI_MODEL,
+        dimensions: EMBEDDING_DIM,
     };
 
     let response = http_client
-        .post(VOYAGE_API_URL)
-        .header("Authorization", format!("Bearer {voyage_api_key}"))
+        .post(OPENAI_API_URL)
+        .header("Authorization", format!("Bearer {api_key}"))
         .json(&request)
         .send()
         .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Voyage API request failed: {e}")))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("OpenAI API request failed: {e}")))?;
 
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         return Err(AppError::Internal(anyhow::anyhow!(
-            "Voyage API error {status}: {body}"
+            "OpenAI API error {status}: {body}"
         )));
     }
 
-    let voyage_resp: VoyageResponse = response
+    let resp: EmbeddingResponse = response
         .json()
         .await
-        .map_err(|e| AppError::Internal(anyhow::anyhow!("Voyage API parse error: {e}")))?;
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("OpenAI API parse error: {e}")))?;
 
-    let mut items = voyage_resp.data;
+    let mut items = resp.data;
     items.sort_by_key(|item| item.index);
     Ok(items.into_iter().map(|item| item.embedding).collect())
 }
@@ -316,7 +311,7 @@ fn chunk_content(content: &str) -> Vec<String> {
 }
 
 /// Averages multiple embedding vectors into one.
-fn average_embeddings(items: &[VoyageEmbeddingItem]) -> Vec<f32> {
+fn average_embeddings(items: &[EmbeddingItem]) -> Vec<f32> {
     #[allow(clippy::cast_precision_loss)]
     let n = items.len() as f32;
     let mut avg = vec![0.0_f32; EMBEDDING_DIM];

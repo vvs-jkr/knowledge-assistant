@@ -395,16 +395,16 @@ async fn search_notes(
         return Err(AppError::BadRequest("Search query cannot be empty".into()));
     }
 
-    if state.voyage_api_key.is_empty() {
+    if state.embedding_api_key.is_empty() {
         return Err(AppError::BadRequest(
-            "Search is not configured (missing VOYAGE_API_KEY)".into(),
+            "Search is not configured (missing OPENROUTER_API_KEY)".into(),
         ));
     }
 
     // Embed the query.
     let query_embedding = embeddings::generate_embedding(
         &state.http_client,
-        &state.voyage_api_key,
+        &state.embedding_api_key,
         &body.query,
         "query",
     )
@@ -632,14 +632,14 @@ fn make_snippet(content: &str, query: &str, max_len: usize) -> String {
 /// Spawns a background task to generate and store an embedding for `note_id`.
 /// Logs a warning on failure -- never panics, never fails the calling request.
 fn spawn_embedding(state: &AppState, note_id: String, content: String) {
-    if state.voyage_api_key.is_empty() {
+    if state.embedding_api_key.is_empty() {
         return;
     }
     let state = state.clone();
     tokio::spawn(async move {
         match embeddings::generate_embedding(
             &state.http_client,
-            &state.voyage_api_key,
+            &state.embedding_api_key,
             &content,
             "document",
         )
