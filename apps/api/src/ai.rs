@@ -570,16 +570,18 @@ pub async fn chat(
 ) -> ApiResult<String> {
     let system = chat_system_prompt(training_context);
 
-    // Build messages array: history + new user message (last item in history).
-    let messages: Vec<serde_json::Value> = history
-        .iter()
-        .map(|t| serde_json::json!({ "role": t.role, "content": t.content }))
-        .collect();
+    // System prompt as first message (OpenAI-compatible format used by OpenRouter).
+    let mut messages: Vec<serde_json::Value> =
+        vec![serde_json::json!({ "role": "system", "content": system })];
+    messages.extend(
+        history
+            .iter()
+            .map(|t| serde_json::json!({ "role": t.role, "content": t.content })),
+    );
 
     let body = serde_json::json!({
         "model": model,
         "max_tokens": 1024,
-        "system": system,
         "messages": messages,
     });
 

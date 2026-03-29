@@ -1,42 +1,40 @@
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useWorkouts } from '@/features/workouts/api/workouts.api'
 import { WorkoutCardModal } from '@/features/workouts/components/WorkoutCardModal'
+import {
+  WORKOUT_TYPE_BADGE_COLORS,
+  WORKOUT_TYPE_BORDER_COLORS,
+  WORKOUT_TYPE_LABELS,
+  normalizeWorkoutName,
+} from '@/features/workouts/utils/workout-display'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
-import type { WorkoutSummary } from '@/shared/schemas/workouts.schema'
+import type { WorkoutSummary, WorkoutType } from '@/shared/schemas/workouts.schema'
 import { ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react'
 import { useState } from 'react'
 
 const PAGE_SIZE = 24
 
-const TYPE_COLORS: Record<string, string> = {
-  for_time: 'border-l-blue-500',
-  amrap: 'border-l-green-500',
-  emom: 'border-l-purple-500',
-  tabata: 'border-l-orange-500',
-  lifting: 'border-l-red-500',
-  rounds: 'border-l-cyan-500',
-  other: 'border-l-zinc-400',
-}
-
 function WorkoutCard({ workout, onClick }: { workout: WorkoutSummary; onClick: () => void }) {
-  const accentColor = TYPE_COLORS[workout.workout_type] ?? 'border-l-zinc-400'
+  const type = workout.workout_type as WorkoutType
+  const borderColor = WORKOUT_TYPE_BORDER_COLORS[type] ?? 'border-l-zinc-400'
+  const badgeColor = WORKOUT_TYPE_BADGE_COLORS[type] ?? 'bg-zinc-100 text-zinc-600'
+  const label = WORKOUT_TYPE_LABELS[type] ?? workout.workout_type
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col gap-2 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:shadow-md hover:border-foreground/20 border-l-4 ${accentColor}`}
+      className={`flex flex-col gap-2 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:shadow-md hover:border-foreground/20 border-l-4 ${borderColor}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-medium text-muted-foreground">{workout.date}</span>
-        <Badge variant="outline" className="shrink-0 text-xs">
-          {workout.workout_type}
-        </Badge>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badgeColor}`}>
+          {label}
+        </span>
       </div>
 
       <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
-        {workout.name}
+        {normalizeWorkoutName(workout.name)}
       </p>
 
       <div className="mt-auto flex items-center gap-3 text-xs text-muted-foreground">

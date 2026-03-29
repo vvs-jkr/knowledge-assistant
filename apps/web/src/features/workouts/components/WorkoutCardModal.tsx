@@ -1,22 +1,16 @@
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useUpdateWorkout, useWorkout } from '@/features/workouts/api/workouts.api'
+import {
+  WORKOUT_TYPE_BADGE_COLORS,
+  WORKOUT_TYPE_LABELS,
+  normalizeWorkoutName,
+} from '@/features/workouts/utils/workout-display'
 import type { WorkoutExercise, WorkoutType } from '@/shared/schemas/workouts.schema'
 import { Pencil, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-
-const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
-  for_time: 'For Time',
-  amrap: 'AMRAP',
-  emom: 'EMOM',
-  tabata: 'Tabata',
-  lifting: 'Lifting',
-  rounds: 'Rounds',
-  other: 'Other',
-}
 
 const WORKOUT_TYPES: WorkoutType[] = [
   'for_time',
@@ -207,7 +201,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                     className="text-lg font-semibold"
                   />
                 ) : (
-                  <DialogTitle className="text-xl leading-tight">{workout.name}</DialogTitle>
+                  <DialogTitle className="text-xl leading-tight">{normalizeWorkoutName(workout.name)}</DialogTitle>
                 )}
                 {!editing && (
                   <Button
@@ -260,7 +254,9 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
               ) : (
                 <>
                   <span>{workout.date}</span>
-                  <Badge variant="secondary">{WORKOUT_TYPE_LABELS[workout.workout_type] ?? workout.workout_type}</Badge>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${WORKOUT_TYPE_BADGE_COLORS[workout.workout_type] ?? 'bg-zinc-100 text-zinc-600'}`}>
+                    {WORKOUT_TYPE_LABELS[workout.workout_type] ?? workout.workout_type}
+                  </span>
                   {workout.duration_mins !== null && <span>{workout.duration_mins} мин</span>}
                   {workout.rounds !== null && <span>{workout.rounds} раундов</span>}
                 </>
