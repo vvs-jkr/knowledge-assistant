@@ -199,8 +199,12 @@ export function useUpdateWorkout() {
 }
 
 export function useAnalyzeWorkouts() {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: workoutsApi.analyze,
+    onSuccess: (data) => {
+      qc.setQueryData<WorkoutAnalysis>(['workouts', 'analysis'], data)
+    },
   })
 }
 

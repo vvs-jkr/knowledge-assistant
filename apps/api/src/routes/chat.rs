@@ -381,6 +381,25 @@ async fn send_message(
 async fn build_training_context(state: &AppState, user_id: &str) -> ApiResult<String> {
     let mut parts: Vec<String> = Vec::new();
 
+    // Training goals -- prepended so the AI treats them as highest-priority context.
+    let goals_row = sqlx::query(
+        "SELECT goals, active FROM training_goals WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    if let Some(row) = goals_row {
+        let active_int: i64 = row.try_get("active").map_err(AppError::from)?;
+        if active_int != 0 {
+            let goals: String = row.try_get("goals").map_err(AppError::from)?;
+            if !goals.is_empty() {
+                parts.push(format!("## Цели тренировок\n{goals}"));
+            }
+        }
+    }
+
     // Cached workout analysis + representative examples.
     let cache_row = sqlx::query(
         "SELECT analysis, workout_examples FROM workout_analysis_cache WHERE user_id = ?",

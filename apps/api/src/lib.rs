@@ -11,6 +11,7 @@ pub mod knowledge;
 pub mod middleware;
 pub mod notes;
 pub mod routes;
+pub mod training_goals;
 pub mod workouts;
 
 use axum::{routing::get, Router};
@@ -24,6 +25,7 @@ pub fn build_app(state: config::AppState) -> Router {
         .merge(routes::health::router())
         .merge(routes::workouts::router())
         .merge(routes::chat::router())
+        .merge(routes::training_goals::router())
         .merge(routes::knowledge::router())
         .layer(
             CorsLayer::new()

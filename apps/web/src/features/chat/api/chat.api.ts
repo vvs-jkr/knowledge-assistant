@@ -2,8 +2,10 @@ import { api } from '@/shared/lib/api'
 import {
   type ChatMessage,
   type ChatSession,
+  type TrainingGoals,
   chatMessageSchema,
   chatSessionSchema,
+  trainingGoalsSchema,
 } from '@/shared/schemas/chat.schema'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -31,6 +33,12 @@ const chatApi = {
     api
       .post<ChatMessage>(`/chat/sessions/${sessionId}/messages`, { content })
       .then((r) => chatMessageSchema.parse(r.data)),
+
+  getTrainingGoals: (): Promise<TrainingGoals> =>
+    api.get<TrainingGoals>('/training-goals').then((r) => trainingGoalsSchema.parse(r.data)),
+
+  updateTrainingGoals: (body: { goals?: string; active?: boolean }): Promise<TrainingGoals> =>
+    api.put<TrainingGoals>('/training-goals', body).then((r) => trainingGoalsSchema.parse(r.data)),
 }
 
 export function useChatSessions() {
@@ -109,6 +117,25 @@ export function useSendMessage(sessionId: string) {
       qc.setQueryData<ChatMessage[]>(['chat', 'messages', sessionId], (prev) =>
         (prev ?? []).filter((m) => !m.id.startsWith('temp-'))
       )
+    },
+  })
+}
+
+export function useTrainingGoals() {
+  return useQuery({
+    queryKey: ['training-goals'],
+    queryFn: chatApi.getTrainingGoals,
+    staleTime: 60_000,
+  })
+}
+
+export function useUpdateTrainingGoals() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { goals?: string; active?: boolean }) =>
+      chatApi.updateTrainingGoals(body),
+    onSuccess: (updated) => {
+      qc.setQueryData<TrainingGoals>(['training-goals'], updated)
     },
   })
 }
