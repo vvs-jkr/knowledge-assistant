@@ -22,7 +22,7 @@ export function WorkoutsMainPanel() {
             onClick={() => setActiveTab('list')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'list'
-                ? 'border-b-2 border-foreground text-foreground'
+                ? 'border-b-2 border-primary text-primary'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -33,7 +33,7 @@ export function WorkoutsMainPanel() {
             onClick={() => setActiveTab('cards')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'cards'
-                ? 'border-b-2 border-foreground text-foreground'
+                ? 'border-b-2 border-primary text-primary'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -44,7 +44,7 @@ export function WorkoutsMainPanel() {
             onClick={() => setActiveTab('stats')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'stats'
-                ? 'border-b-2 border-foreground text-foreground'
+                ? 'border-b-2 border-primary text-primary'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >

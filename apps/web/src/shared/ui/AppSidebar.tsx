@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useSidebarCounts } from '@/shared/hooks/useSidebarCounts'
 import {
   Activity,
   BookOpen,
@@ -11,11 +12,18 @@ import {
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
-const NAV_LINKS = [
-  { to: '/notes', label: 'Notes', icon: FileText },
-  { to: '/health', label: 'Health', icon: Heart },
-  { to: '/workouts', label: 'Workouts', icon: Activity },
-  { to: '/knowledge', label: 'Knowledge', icon: BookOpen },
+interface NavItem {
+  to: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  countKey?: 'notes' | 'workouts' | 'knowledge' | 'health'
+}
+
+const NAV_LINKS: NavItem[] = [
+  { to: '/notes', label: 'Notes', icon: FileText, countKey: 'notes' },
+  { to: '/health', label: 'Health', icon: Heart, countKey: 'health' },
+  { to: '/workouts', label: 'Workouts', icon: Activity, countKey: 'workouts' },
+  { to: '/knowledge', label: 'Knowledge', icon: BookOpen, countKey: 'knowledge' },
   { to: '/chat', label: 'Coach', icon: MessageCircle },
 ]
 
@@ -25,6 +33,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
+  const counts = useSidebarCounts()
+
   return (
     <aside
       className={cn(
@@ -51,25 +61,38 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
       </div>
 
       <nav className="flex flex-col gap-1 p-2">
-        {NAV_LINKS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            title={collapsed ? label : undefined}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-md px-2 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary/10 text-primary ring-1 ring-primary/20'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                collapsed && 'justify-center px-0'
-              )
-            }
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>{label}</span>}
-          </NavLink>
-        ))}
+        {NAV_LINKS.map(({ to, label, icon: Icon, countKey }) => {
+          const count = countKey ? counts[countKey] : 0
+
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              title={collapsed ? label : undefined}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-2 py-2.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary/10 text-primary ring-1 ring-primary/20'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  collapsed && 'justify-center px-0'
+                )
+              }
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="flex-1">{label}</span>
+                  {count > 0 && (
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                      {count > 999 ? '999+' : count}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          )
+        })}
       </nav>
     </aside>
   )

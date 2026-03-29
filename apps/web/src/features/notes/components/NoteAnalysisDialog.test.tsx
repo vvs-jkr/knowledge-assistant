@@ -13,6 +13,16 @@ vi.mock('@/features/notes/api/notes.api', () => ({
     isSuccess: false,
     data: undefined,
   })),
+  useImproveNote: vi.fn(() => ({
+    mutate: vi.fn(),
+    reset: vi.fn(),
+    isPending: false,
+    isError: false,
+    isSuccess: false,
+    data: undefined,
+  })),
+  useNote: vi.fn(() => ({ data: undefined, isLoading: false })),
+  useUpdateNote: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }))
 
 const resetStore = () =>
@@ -41,7 +51,7 @@ describe('NoteAnalysisDialog', () => {
 
   it('renders the analyze trigger button', () => {
     render(<NoteAnalysisDialog noteId="note-1" />)
-    expect(screen.getByRole('button', { name: /analyze/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /анализ/i })).toBeDefined()
   })
 
   it('opens the dialog and calls mutate when triggered', async () => {
@@ -58,8 +68,8 @@ describe('NoteAnalysisDialog', () => {
 
     const user = userEvent.setup()
     render(<NoteAnalysisDialog noteId="note-1" />)
-    await user.click(screen.getByRole('button', { name: /analyze/i }))
-    expect(screen.getByText('AI Analysis')).toBeDefined()
+    await user.click(screen.getByRole('button', { name: /анализ/i }))
+    expect(screen.getByText('AI Анализ')).toBeDefined()
     expect(mockMutate).toHaveBeenCalledWith('note-1')
   })
 
@@ -76,7 +86,7 @@ describe('NoteAnalysisDialog', () => {
 
     const user = userEvent.setup()
     render(<NoteAnalysisDialog noteId="note-1" />)
-    await user.click(screen.getByRole('button', { name: /analyze/i }))
+    await user.click(screen.getByRole('button', { name: /анализ/i }))
     expect(document.body.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0)
   })
 
@@ -93,9 +103,9 @@ describe('NoteAnalysisDialog', () => {
 
     const user = userEvent.setup()
     render(<NoteAnalysisDialog noteId="note-1" />)
-    await user.click(screen.getByRole('button', { name: /analyze/i }))
-    expect(screen.getByText('Analysis failed')).toBeDefined()
-    expect(screen.getByRole('button', { name: /retry/i })).toBeDefined()
+    await user.click(screen.getByRole('button', { name: /анализ/i }))
+    expect(screen.getByText('Анализ не удался')).toBeDefined()
+    expect(screen.getByRole('button', { name: /повторить/i })).toBeDefined()
   })
 
   it('shows analysis summary, quality score, tags, and suggestions on success', async () => {
@@ -111,7 +121,7 @@ describe('NoteAnalysisDialog', () => {
 
     const user = userEvent.setup()
     render(<NoteAnalysisDialog noteId="note-1" />)
-    await user.click(screen.getByRole('button', { name: /analyze/i }))
+    await user.click(screen.getByRole('button', { name: /анализ/i }))
     expect(screen.getByText('A great note about Rust.')).toBeDefined()
     expect(screen.getByText('8/10')).toBeDefined()
     expect(screen.getByText('rust')).toBeDefined()
@@ -139,7 +149,7 @@ describe('NoteAnalysisDialog', () => {
 
     const user = userEvent.setup()
     render(<NoteAnalysisDialog noteId="note-1" />)
-    await user.click(screen.getByRole('button', { name: /analyze/i }))
+    await user.click(screen.getByRole('button', { name: /анализ/i }))
     expect(screen.getByText('similar.md')).toBeDefined()
     expect(screen.getByText('Same topic')).toBeDefined()
   })

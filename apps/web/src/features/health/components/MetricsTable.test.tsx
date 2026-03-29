@@ -25,7 +25,7 @@ describe('MetricsTable', () => {
 
   it('shows empty state when no metrics', () => {
     render(<MetricsTable />)
-    expect(screen.getByText('No metrics found')).toBeDefined()
+    expect(screen.getByText('Нет данных')).toBeDefined()
   })
 
   it('shows skeleton while loading', async () => {
@@ -48,7 +48,7 @@ describe('MetricsTable', () => {
     expect(screen.getByText('glucose')).toBeDefined()
     expect(screen.getByText('5.1')).toBeDefined()
     expect(screen.getByText('mmol/L')).toBeDefined()
-    expect(screen.getByText('normal')).toBeDefined()
+    expect(screen.getAllByText('Норма').length).toBeGreaterThan(0)
   })
 
   it('renders reference range when both min and max present', async () => {
@@ -58,16 +58,16 @@ describe('MetricsTable', () => {
       isLoading: false,
     } as ReturnType<typeof useHealthMetrics>)
     render(<MetricsTable />)
-    expect(screen.getByText('3.9 – 6.1')).toBeDefined()
+    expect(screen.getByText('3.9 - 6.1')).toBeDefined()
   })
 
-  it('renders — when reference range is null', async () => {
+  it('renders -- when reference range is null', async () => {
     const { useHealthMetrics } = await import('@/features/health/api/health.api')
     vi.mocked(useHealthMetrics).mockReturnValueOnce({
       data: [{ ...mockMetric, reference_min: null, reference_max: null }],
       isLoading: false,
     } as ReturnType<typeof useHealthMetrics>)
     render(<MetricsTable />)
-    expect(screen.getByText('—')).toBeDefined()
+    expect(screen.getByText('--')).toBeDefined()
   })
 })

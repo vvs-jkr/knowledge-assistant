@@ -67,8 +67,8 @@ export function NoteList() {
             className={cn(
               'group flex items-center rounded-md text-sm',
               selectedNoteId === note.id
-                ? 'bg-accent text-accent-foreground'
-                : 'hover:bg-accent hover:text-accent-foreground'
+                ? 'bg-primary/10 text-primary'
+                : 'hover:bg-muted hover:text-foreground'
             )}
           >
             <button

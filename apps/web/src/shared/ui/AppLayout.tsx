@@ -20,9 +20,6 @@ export function AppLayout() {
         <main className="flex flex-1 overflow-hidden">
           <Outlet />
         </main>
-        <footer className="shrink-0 border-t px-6 py-2 text-xs text-muted-foreground">
-          Knowledge Hub © 2026
-        </footer>
       </div>
       <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>

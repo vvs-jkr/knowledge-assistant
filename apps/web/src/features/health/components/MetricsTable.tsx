@@ -1,6 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import { useHealthMetrics } from '@/features/health/api/health.api'
 import type { HealthMetric, MetricsQuery } from '@/shared/schemas/health.schema'
+import { TrendingDown, TrendingUp } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Localisation
@@ -121,6 +122,46 @@ function formatDate(iso: string): string {
   return `${day}.${month}.${year}`
 }
 
+function buildPrevValueMap(metrics: HealthMetric[]): Map<string, number> {
+  // For each metric name, collect all (date, value) pairs sorted ascending.
+  const byName = new Map<string, { date: string; value: number }[]>()
+  for (const m of metrics) {
+    if (!byName.has(m.metric_name)) byName.set(m.metric_name, [])
+    byName.get(m.metric_name)?.push({ date: m.recorded_date, value: m.value })
+  }
+  // Map key = `${metricName}|${date}` -> previous value
+  const prevMap = new Map<string, number>()
+  for (const [name, entries] of byName) {
+    entries.sort((a, b) => a.date.localeCompare(b.date))
+    for (let i = 1; i < entries.length; i++) {
+      prevMap.set(`${name}|${entries[i].date}`, entries[i - 1].value)
+    }
+  }
+  return prevMap
+}
+
+interface DeltaProps {
+  current: number
+  prev: number | undefined
+}
+
+function Delta({ current, prev }: DeltaProps) {
+  if (prev === undefined) return null
+  const diff = current - prev
+  if (Math.abs(diff) < 0.001) return null
+  const pct = ((diff / prev) * 100).toFixed(1)
+  const isUp = diff > 0
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-xs font-medium ${isUp ? 'text-success' : 'text-destructive'}`}
+    >
+      {isUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {isUp ? '+' : ''}
+      {pct}%
+    </span>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Grouped rendering
 // ---------------------------------------------------------------------------
@@ -200,6 +241,7 @@ export function MetricsTable({ params }: MetricsTableProps) {
   }
 
   const groups = groupMetrics(metrics)
+  const prevMap = buildPrevValueMap(metrics)
 
   return (
     <div className="overflow-auto">
@@ -208,6 +250,7 @@ export function MetricsTable({ params }: MetricsTableProps) {
           <tr className="border-b text-left text-xs text-muted-foreground">
             <th className="px-4 py-2 font-medium">Показатель</th>
             <th className="px-4 py-2 font-medium">Значение</th>
+            <th className="px-4 py-2 font-medium">Δ</th>
             <th className="px-4 py-2 font-medium">Ед.</th>
             <th className="px-4 py-2 font-medium">Норма</th>
             <th className="px-4 py-2 font-medium">Статус</th>
@@ -219,7 +262,7 @@ export function MetricsTable({ params }: MetricsTableProps) {
               {/* Date header row */}
               <tr key={`date-${group.date}`} className="border-b bg-muted/30">
                 <td
-                  colSpan={5}
+                  colSpan={6}
                   className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
                 >
                   {formatDate(group.date)}
@@ -230,7 +273,7 @@ export function MetricsTable({ params }: MetricsTableProps) {
                 <>
                   {/* Category sub-header */}
                   <tr key={`cat-${group.date}-${cat.label}`} className="border-b bg-muted/10">
-                    <td colSpan={5} className="px-4 py-1.5 text-xs font-medium text-foreground/60">
+                    <td colSpan={6} className="px-4 py-1.5 text-xs font-medium text-foreground/60">
                       {cat.label}
                     </td>
                   </tr>
@@ -245,6 +288,12 @@ export function MetricsTable({ params }: MetricsTableProps) {
                         {METRIC_LABELS[m.metric_name] ?? m.metric_name}
                       </td>
                       <td className="px-4 py-2 tabular-nums">{m.value}</td>
+                      <td className="px-4 py-2">
+                        <Delta
+                          current={m.value}
+                          prev={prevMap.get(`${m.metric_name}|${m.recorded_date}`)}
+                        />
+                      </td>
                       <td className="px-4 py-2 text-muted-foreground">{m.unit || '--'}</td>
                       <td className="px-4 py-2 text-muted-foreground">
                         {formatReference(m.reference_min, m.reference_max)}

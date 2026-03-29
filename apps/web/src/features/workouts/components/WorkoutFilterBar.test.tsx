@@ -13,12 +13,16 @@ beforeEach(() => {
 })
 
 describe('WorkoutFilterBar', () => {
-  it('renders type select, from/to date inputs, and reset button', () => {
+  it('renders type select and from/to date inputs', () => {
     render(<WorkoutFilterBar />)
     expect(screen.getByRole('combobox', { name: /filter by workout type/i })).toBeTruthy()
     expect(screen.getByLabelText(/from date/i)).toBeTruthy()
     expect(screen.getByLabelText(/to date/i)).toBeTruthy()
-    expect(screen.getByRole('button', { name: /reset/i })).toBeTruthy()
+  })
+
+  it('does not show clear button when no filters active', () => {
+    render(<WorkoutFilterBar />)
+    expect(screen.queryByRole('button', { name: /clear/i })).toBeNull()
   })
 
   it('calls setFilter when workout type changes', async () => {
@@ -37,11 +41,11 @@ describe('WorkoutFilterBar', () => {
     expect(useWorkoutsStore.getState().filters.from).toBe('2026-01-01')
   })
 
-  it('calls resetFilters when reset button is clicked', async () => {
+  it('calls resetFilters when clear button is clicked', async () => {
     const user = userEvent.setup()
     useWorkoutsStore.getState().setFilter('workout_type', 'lifting')
     render(<WorkoutFilterBar />)
-    await user.click(screen.getByRole('button', { name: /reset/i }))
+    await user.click(screen.getByRole('button', { name: /clear/i }))
     expect(useWorkoutsStore.getState().filters).toEqual({
       workout_type: null,
       from: null,

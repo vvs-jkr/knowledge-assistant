@@ -5,6 +5,7 @@ import { TypeDonutChart } from '@/features/workouts/components/TypeDonutChart'
 import { VolumeBarChart } from '@/features/workouts/components/VolumeBarChart'
 import { WorkoutCalendarHeatmap } from '@/features/workouts/components/WorkoutCalendarHeatmap'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
+import { Activity, Flame, ScrollText } from 'lucide-react'
 import { useState } from 'react'
 
 export function StatsPanel() {
@@ -46,19 +47,34 @@ export function StatsPanel() {
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto p-4">
-      {/* Summary — simple bordered divs, no Card background */}
+      {/* Summary stat blocks */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border p-4">
-          <p className="text-sm text-muted-foreground">Total Workouts</p>
-          <p className="text-2xl font-bold">{stats.total_workouts}</p>
+        <div className="flex items-start justify-between rounded-xl border p-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Total Workouts</p>
+            <p className="mt-1 text-2xl font-bold">{stats.total_workouts}</p>
+          </div>
+          <div className="rounded-lg bg-primary/10 p-2">
+            <Activity className="h-4 w-4 text-primary" />
+          </div>
         </div>
-        <div className="rounded-xl border p-4">
-          <p className="text-sm text-muted-foreground">Total Logs</p>
-          <p className="text-2xl font-bold">{stats.total_logs}</p>
+        <div className="flex items-start justify-between rounded-xl border p-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Total Logs</p>
+            <p className="mt-1 text-2xl font-bold">{stats.total_logs}</p>
+          </div>
+          <div className="rounded-lg bg-success/10 p-2">
+            <ScrollText className="h-4 w-4 text-success" />
+          </div>
         </div>
-        <div className="rounded-xl border p-4">
-          <p className="text-sm text-muted-foreground">Streak</p>
-          <p className="text-2xl font-bold">{stats.current_streak_days} days</p>
+        <div className="flex items-start justify-between rounded-xl border p-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Streak</p>
+            <p className="mt-1 text-2xl font-bold">{stats.current_streak_days} days</p>
+          </div>
+          <div className="rounded-lg bg-orange-500/10 p-2">
+            <Flame className="h-4 w-4 text-orange-500" />
+          </div>
         </div>
       </div>
 
@@ -74,7 +90,7 @@ export function StatsPanel() {
         </div>
       </div>
 
-      {/* Weekly volume — full width */}
+      {/* Weekly volume -- full width */}
       <div className="rounded-xl border p-4">
         <p className="mb-2 text-sm font-medium">Weekly Volume</p>
         <VolumeBarChart data={stats.weekly_volume} />
@@ -98,7 +114,7 @@ export function StatsPanel() {
                 setSelectedExerciseName('')
               }
             }}
-            placeholder="Search exercises…"
+            placeholder="Search exercises..."
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           <datalist id="exercises-list">

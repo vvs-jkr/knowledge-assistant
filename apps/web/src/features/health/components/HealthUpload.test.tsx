@@ -13,7 +13,7 @@ describe('HealthUpload', () => {
 
   it('renders the upload prompt text', () => {
     render(<HealthUpload />)
-    expect(screen.getByText('Drop PDF or click')).toBeDefined()
+    expect(screen.getByText('Drop PDF or InBody CSV')).toBeDefined()
   })
 
   it('renders a hidden file input', () => {
@@ -45,13 +45,13 @@ describe('HealthUpload', () => {
     expect(btn.hasAttribute('disabled')).toBe(true)
   })
 
-  it('shows "Analyzing…" when mutation is pending', async () => {
+  it('shows "Analyzing..." when mutation is pending', async () => {
     const { useUploadHealth } = await import('@/features/health/api/health.api')
     vi.mocked(useUploadHealth).mockReturnValueOnce({
       mutate: vi.fn(),
       isPending: true,
     } as unknown as ReturnType<typeof useUploadHealth>)
     render(<HealthUpload />)
-    expect(screen.getByText('Analyzing…')).toBeDefined()
+    expect(screen.getByText('Uploading...')).toBeDefined()
   })
 })

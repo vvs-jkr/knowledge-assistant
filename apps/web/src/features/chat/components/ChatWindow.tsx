@@ -75,7 +75,7 @@ export function ChatWindow({ sessionId }: Props) {
         <div ref={bottomRef} />
       </ScrollArea>
 
-      <div className="border-t px-4 py-3">
+      <div className="border-t bg-card px-4 py-3">
         <div className="flex gap-2">
           <textarea
             value={input}
@@ -84,7 +84,7 @@ export function ChatWindow({ sessionId }: Props) {
             placeholder="Напиши вопрос... (Enter -- отправить, Shift+Enter -- новая строка)"
             rows={1}
             disabled={sendMessage.isPending}
-            className="min-h-[38px] flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+            className="min-h-[38px] flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
           />
           <Button
             size="icon"
