@@ -26,7 +26,7 @@ export function WorkoutFilterBar() {
           const val = e.target.value
           setFilter('workout_type', val === '' ? null : val)
         }}
-        className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         <option value="">All types</option>
         {WORKOUT_TYPES.map((wt) => (

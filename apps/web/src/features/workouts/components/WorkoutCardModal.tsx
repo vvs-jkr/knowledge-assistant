@@ -228,7 +228,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                   <select
                     value={workoutType}
                     onChange={(e) => setWorkoutType(e.target.value as WorkoutType)}
-                    className="rounded-md border border-input bg-transparent px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     {WORKOUT_TYPES.map((t) => (
                       <option key={t} value={t}>
