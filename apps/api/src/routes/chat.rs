@@ -444,7 +444,9 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
                         let mut workout_lines: Vec<String> = Vec::new();
                         for (workout_id, _distance) in hits {
                             let row = sqlx::query(
-                                r"SELECT w.name, w.workout_type, w.duration_mins, w.rounds,
+                                r"SELECT w.name, w.workout_type,
+                                         CAST(w.duration_mins AS REAL) AS duration_mins,
+                                         CAST(w.rounds AS INTEGER) AS rounds,
                                          group_concat(e.name, ', ') AS exercise_names
                                   FROM workouts w
                                   LEFT JOIN workout_exercises we ON we.workout_id = w.id

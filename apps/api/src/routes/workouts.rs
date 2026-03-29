@@ -340,8 +340,11 @@ async fn embed_all_workouts(
     .collect();
 
     // Fetch all workouts with their exercises in one query.
+    // CAST normalises mixed INTEGER/REAL storage from the digitizer.
     let rows = sqlx::query(
-        r"SELECT w.id, w.name, w.workout_type, w.duration_mins, w.rounds,
+        r"SELECT w.id, w.name, w.workout_type,
+                 CAST(w.duration_mins AS REAL) AS duration_mins,
+                 CAST(w.rounds AS INTEGER) AS rounds,
                  group_concat(e.name, ', ') AS exercise_names
           FROM workouts w
           LEFT JOIN workout_exercises we ON we.workout_id = w.id
@@ -767,7 +770,9 @@ fn spawn_workout_embedding(state: &AppState, workout_id: String) {
     tokio::spawn(async move {
         // Fetch workout row + exercises for text.
         let row = sqlx::query(
-            r"SELECT w.name, w.workout_type, w.duration_mins, w.rounds,
+            r"SELECT w.name, w.workout_type,
+                     CAST(w.duration_mins AS REAL) AS duration_mins,
+                     CAST(w.rounds AS INTEGER) AS rounds,
                      group_concat(e.name, ', ') AS exercise_names
               FROM workouts w
               LEFT JOIN workout_exercises we ON we.workout_id = w.id
