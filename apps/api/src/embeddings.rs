@@ -88,6 +88,56 @@ pub async fn generate_embedding(
     Ok(average_embeddings(&voyage_resp.data))
 }
 
+/// Generates embeddings for a batch of texts in a single Voyage AI request.
+///
+/// Returns one embedding vector per input text, in the same order.
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the Voyage AI request fails or the response is malformed.
+pub async fn generate_embeddings_batch(
+    http_client: &reqwest::Client,
+    voyage_api_key: &str,
+    texts: &[&str],
+) -> ApiResult<Vec<Vec<f32>>> {
+    if texts.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let request = VoyageRequest {
+        input: texts.to_vec(),
+        model: VOYAGE_MODEL,
+        input_type: "document",
+        output_dimension: EMBEDDING_DIM,
+        truncation: true,
+    };
+
+    let response = http_client
+        .post(VOYAGE_API_URL)
+        .header("Authorization", format!("Bearer {voyage_api_key}"))
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Voyage API request failed: {e}")))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "Voyage API error {status}: {body}"
+        )));
+    }
+
+    let voyage_resp: VoyageResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("Voyage API parse error: {e}")))?;
+
+    let mut items = voyage_resp.data;
+    items.sort_by_key(|item| item.index);
+    Ok(items.into_iter().map(|item| item.embedding).collect())
+}
+
 /// Stores or replaces the embedding for `note_id` in the vec0 virtual table.
 pub async fn upsert_embedding(
     db: &sqlx::SqlitePool,
@@ -151,6 +201,65 @@ pub async fn delete_knowledge_embedding(
         .await
         .map_err(|e| AppError::Internal(anyhow::anyhow!("knowledge embedding delete: {e}")))?;
     Ok(())
+}
+
+/// Stores or replaces the embedding for `workout_id` in the workout vec0 virtual table.
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the database operation fails.
+pub async fn upsert_workout_embedding(
+    db: &sqlx::SqlitePool,
+    workout_id: &str,
+    embedding: &[f32],
+) -> ApiResult<()> {
+    let bytes = embedding_to_bytes(embedding);
+    sqlx::query(
+        "INSERT OR REPLACE INTO workout_embeddings(workout_id, embedding) VALUES (?, ?)",
+    )
+    .bind(workout_id)
+    .bind(&bytes)
+    .execute(db)
+    .await
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("workout embedding upsert: {e}")))?;
+    Ok(())
+}
+
+/// Deletes the embedding for `workout_id` from the workout vec0 virtual table.
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the database operation fails.
+pub async fn delete_workout_embedding(db: &sqlx::SqlitePool, workout_id: &str) -> ApiResult<()> {
+    sqlx::query("DELETE FROM workout_embeddings WHERE workout_id = ?")
+        .bind(workout_id)
+        .execute(db)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("workout embedding delete: {e}")))?;
+    Ok(())
+}
+
+/// Searches `workout_embeddings` for the `limit` nearest neighbours of `embedding_bytes`.
+///
+/// Returns `(workout_id, distance)` pairs ordered by ascending distance.
+///
+/// # Errors
+///
+/// Returns `AppError::Internal` if the vector search fails.
+pub async fn search_workout_embeddings(
+    db: &sqlx::SqlitePool,
+    embedding_bytes: &[u8],
+    limit: i64,
+) -> ApiResult<Vec<(String, f64)>> {
+    sqlx::query_as(
+        "SELECT workout_id, distance FROM workout_embeddings \
+         WHERE embedding MATCH ? ORDER BY distance LIMIT ?",
+    )
+    .bind(embedding_bytes)
+    .bind(limit)
+    .fetch_all(db)
+    .await
+    .map_err(|e| AppError::Internal(anyhow::anyhow!("workout vector search: {e}")))
 }
 
 /// Searches `knowledge_embeddings` for the `limit` nearest neighbours of `embedding_bytes`.
@@ -258,7 +367,7 @@ mod tests {
     fn embedding_to_bytes_round_trip() {
         let emb: Vec<f32> = vec![1.0, 2.0, 3.0];
         let bytes = embedding_to_bytes(&emb);
-        assert_eq!(bytes.len(), 12); // 3 × 4 bytes
+        assert_eq!(bytes.len(), 12); // 3 x 4 bytes
         let recovered: Vec<f32> = bytes
             .chunks_exact(4)
             .map(|b| f32::from_le_bytes(b.try_into().expect("4 bytes")))

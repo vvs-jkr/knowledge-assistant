@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -293,8 +295,8 @@ async fn send_message(
     .await
     .map_err(AppError::from)?;
 
-    // Build training context from cached analysis + recent health metrics.
-    let training_context = build_training_context(&state, &claims.sub).await?;
+    // Build training context from cached analysis + KNN workout search + recent health metrics.
+    let training_context = build_training_context(&state, &claims.sub, &content).await?;
 
     // Load full conversation history for the AI.
     let history_rows = sqlx::query(
@@ -377,8 +379,9 @@ async fn send_message(
     }))
 }
 
-/// Build training context string from cached workout analysis + recent health metrics.
-async fn build_training_context(state: &AppState, user_id: &str) -> ApiResult<String> {
+/// Build training context string from cached workout analysis + KNN workout search + recent health metrics.
+#[allow(clippy::too_many_lines)]
+async fn build_training_context(state: &AppState, user_id: &str, query: &str) -> ApiResult<String> {
     let mut parts: Vec<String> = Vec::new();
 
     // Training goals -- prepended so the AI treats them as highest-priority context.
@@ -400,9 +403,9 @@ async fn build_training_context(state: &AppState, user_id: &str) -> ApiResult<St
         }
     }
 
-    // Cached workout analysis + representative examples.
+    // Cached workout analysis summary.
     let cache_row = sqlx::query(
-        "SELECT analysis, workout_examples FROM workout_analysis_cache WHERE user_id = ?",
+        "SELECT analysis FROM workout_analysis_cache WHERE user_id = ?",
     )
     .bind(user_id)
     .fetch_optional(&state.db)
@@ -411,8 +414,6 @@ async fn build_training_context(state: &AppState, user_id: &str) -> ApiResult<St
 
     if let Some(row) = cache_row {
         let analysis_json: String = row.try_get("analysis").map_err(AppError::from)?;
-        let examples: String = row.try_get("workout_examples").map_err(AppError::from)?;
-
         if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&analysis_json) {
             parts.push(format!(
                 "## Анализ тренировок\n{}\n\nПаттерны: {}\nБаланс мышц: {}\nРекомендуемый фокус: {}",
@@ -422,11 +423,86 @@ async fn build_training_context(state: &AppState, user_id: &str) -> ApiResult<St
                 analysis.suggested_focus,
             ));
         }
+    }
 
-        if !examples.is_empty() {
-            parts.push(format!(
-                "## Примеры тренировок по типам (для генерации новых тренировок)\n{examples}"
-            ));
+    // KNN workout search: find examples most relevant to the user's query.
+    if !state.voyage_api_key.is_empty() && !query.is_empty() {
+        match crate::embeddings::generate_embedding(
+            &state.http_client,
+            &state.voyage_api_key,
+            query,
+            "query",
+        )
+        .await
+        {
+            Ok(query_emb) => {
+                let emb_bytes = crate::embeddings::embedding_to_bytes(&query_emb);
+                match crate::embeddings::search_workout_embeddings(&state.db, &emb_bytes, 30).await
+                {
+                    Ok(hits) => {
+                        // Filter to workouts owned by this user.
+                        let mut workout_lines: Vec<String> = Vec::new();
+                        for (workout_id, _distance) in hits {
+                            let row = sqlx::query(
+                                r"SELECT w.name, w.workout_type, w.duration_mins, w.rounds,
+                                         group_concat(e.name, ', ') AS exercise_names
+                                  FROM workouts w
+                                  LEFT JOIN workout_exercises we ON we.workout_id = w.id
+                                  LEFT JOIN exercises e ON e.id = we.exercise_id
+                                  WHERE w.id = ? AND w.user_id = ?
+                                  GROUP BY w.id",
+                            )
+                            .bind(&workout_id)
+                            .bind(user_id)
+                            .fetch_optional(&state.db)
+                            .await
+                            .map_err(AppError::from)?;
+
+                            if let Some(r) = row {
+                                let name: String =
+                                    r.try_get("name").map_err(AppError::from)?;
+                                let wtype: Option<String> =
+                                    r.try_get("workout_type").map_err(AppError::from)?;
+                                let duration: Option<i64> =
+                                    r.try_get("duration_mins").map_err(AppError::from)?;
+                                let rounds: Option<i64> =
+                                    r.try_get("rounds").map_err(AppError::from)?;
+                                let exercises: Option<String> =
+                                    r.try_get("exercise_names").map_err(AppError::from)?;
+
+                                let mut line = format!("- {name}");
+                                if let Some(wt) = wtype {
+                                    write!(line, " [{wt}]").expect("write to String");
+                                }
+                                if let Some(d) = duration {
+                                    write!(line, " {d}min").expect("write to String");
+                                }
+                                if let Some(r) = rounds {
+                                    write!(line, " {r}rds").expect("write to String");
+                                }
+                                if let Some(ex) = exercises {
+                                    if !ex.is_empty() {
+                                        write!(line, ": {ex}").expect("write to String");
+                                    }
+                                }
+                                workout_lines.push(line);
+
+                                if workout_lines.len() >= 10 {
+                                    break;
+                                }
+                            }
+                        }
+                        if !workout_lines.is_empty() {
+                            parts.push(format!(
+                                "## Похожие тренировки из базы (используй как стиль/образец)\n{}",
+                                workout_lines.join("\n")
+                            ));
+                        }
+                    }
+                    Err(e) => tracing::warn!("workout KNN search failed: {e}"),
+                }
+            }
+            Err(e) => tracing::warn!("query embedding failed: {e}"),
         }
     }
 

@@ -53,5 +53,14 @@ pub async fn init(database_url: &str) -> anyhow::Result<sqlx::SqlitePool> {
     .execute(&pool)
     .await?;
 
+    sqlx::query(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS workout_embeddings USING vec0(
+             workout_id TEXT PRIMARY KEY,
+             embedding float[512]
+         )",
+    )
+    .execute(&pool)
+    .await?;
+
     Ok(pool)
 }

@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -13,8 +15,8 @@ use crate::{
     error::{ApiResult, AppError},
     middleware::AuthUser,
     workouts::{
-        validate_date, validate_workout_type, CreateLogRequest, CreateWorkoutRequest, ExerciseInfo,
-        ExerciseInput, ExerciseProgress, ExercisesQuery, GenerateWorkoutRequest,
+        validate_date, validate_workout_type, CreateLogRequest, CreateWorkoutRequest, EmbedAllResponse,
+        ExerciseInfo, ExerciseInput, ExerciseProgress, ExercisesQuery, GenerateWorkoutRequest,
         GeneratedWorkoutResponse, HeatmapEntry, LogsQuery, StatsQuery, TypeDistribution,
         UpdateWorkoutRequest, VolumeEntry, WorkoutAnalysis, WorkoutDetail, WorkoutExercise,
         WorkoutLog, WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
@@ -29,6 +31,7 @@ pub fn router() -> Router<AppState> {
             "/workouts/analyze",
             axum::routing::post(analyze_workouts_handler),
         )
+        .route("/workouts/embed-all", axum::routing::post(embed_all_workouts))
         .route("/workouts/stats", get(get_stats))
         .route("/workouts/exercises", get(list_exercises))
         .route("/workouts/logs", get(list_logs).post(create_log))
@@ -164,6 +167,8 @@ async fn create_workout(
 
     tx.commit().await.map_err(AppError::from)?;
 
+    spawn_workout_embedding(&state, workout_id.clone());
+
     let detail = fetch_workout_detail(&state, &workout_id, &claims.sub).await?;
     Ok((StatusCode::CREATED, Json(detail)))
 }
@@ -270,6 +275,8 @@ async fn update_workout(
 
     tx.commit().await.map_err(AppError::from)?;
 
+    spawn_workout_embedding(&state, id.clone());
+
     let detail = fetch_workout_detail(&state, &id, &claims.sub).await?;
     Ok(Json(detail))
 }
@@ -294,7 +301,98 @@ async fn delete_workout(
         return Err(AppError::NotFound);
     }
 
+    // Clean up the embedding vector.
+    let db = state.db.clone();
+    let workout_id = id.clone();
+    tokio::spawn(async move {
+        if let Err(e) = embeddings::delete_workout_embedding(&db, &workout_id).await {
+            tracing::warn!("Failed to delete workout embedding {workout_id}: {e}");
+        }
+    });
+
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ---------------------------------------------------------------------------
+// POST /workouts/embed-all
+// ---------------------------------------------------------------------------
+
+/// Embeds all workouts for the current user that do not yet have a vector.
+/// Safe to call multiple times -- already-embedded workouts are skipped.
+async fn embed_all_workouts(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+) -> ApiResult<Json<EmbedAllResponse>> {
+    if state.voyage_api_key.is_empty() {
+        return Err(AppError::BadRequest(
+            "Embeddings not configured (missing VOYAGE_API_KEY)".into(),
+        ));
+    }
+
+    // Find workout IDs that already have embeddings.
+    let embedded_ids: std::collections::HashSet<String> = sqlx::query_scalar(
+        "SELECT workout_id FROM workout_embeddings",
+    )
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?
+    .into_iter()
+    .collect();
+
+    // Fetch all workouts with their exercises in one query.
+    let rows = sqlx::query(
+        r"SELECT w.id, w.name, w.workout_type, w.duration_mins, w.rounds,
+                 group_concat(e.name, ', ') AS exercise_names
+          FROM workouts w
+          LEFT JOIN workout_exercises we ON we.workout_id = w.id
+          LEFT JOIN exercises e ON e.id = we.exercise_id
+          WHERE w.user_id = ?
+          GROUP BY w.id
+          ORDER BY w.date ASC",
+    )
+    .bind(&claims.sub)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    // Split into to-embed vs already-done.
+    let mut to_embed: Vec<(String, String)> = Vec::new(); // (id, text)
+    let mut skipped = 0usize;
+
+    for row in &rows {
+        let id: String = row.try_get("id").map_err(AppError::from)?;
+        if embedded_ids.contains(&id) {
+            skipped += 1;
+            continue;
+        }
+        let name: String = row.try_get("name").map_err(AppError::from)?;
+        let workout_type: Option<String> = row.try_get("workout_type").map_err(AppError::from)?;
+        let duration_mins: Option<i64> = row.try_get("duration_mins").map_err(AppError::from)?;
+        let rounds: Option<i64> = row.try_get("rounds").map_err(AppError::from)?;
+        let exercises: Option<String> = row.try_get("exercise_names").map_err(AppError::from)?;
+        let text = build_workout_text(&name, workout_type.as_deref(), duration_mins, rounds, exercises.as_deref());
+        to_embed.push((id, text));
+    }
+
+    // Process in batches of 50.
+    let mut embedded = 0usize;
+
+    for chunk in to_embed.chunks(50) {
+        let texts: Vec<&str> = chunk.iter().map(|(_, t)| t.as_str()).collect();
+        let embeddings_batch = embeddings::generate_embeddings_batch(
+            &state.http_client,
+            &state.voyage_api_key,
+            &texts,
+        )
+        .await?;
+
+        for ((id, _), embedding) in chunk.iter().zip(embeddings_batch.iter()) {
+            embeddings::upsert_workout_embedding(&state.db, id, embedding).await?;
+            embedded += 1;
+        }
+    }
+
+    Ok(Json(EmbedAllResponse { embedded, skipped }))
 }
 
 // ---------------------------------------------------------------------------
@@ -629,6 +727,90 @@ async fn list_logs(
 }
 
 // ---------------------------------------------------------------------------
+// Embedding helpers
+// ---------------------------------------------------------------------------
+
+/// Builds a compact text representation of a workout for embedding.
+fn build_workout_text(
+    name: &str,
+    workout_type: Option<&str>,
+    duration_mins: Option<i64>,
+    rounds: Option<i64>,
+    exercises: Option<&str>,
+) -> String {
+    let mut parts = vec![format!("Workout: {name}")];
+    if let Some(wt) = workout_type {
+        parts.push(format!("Type: {wt}"));
+    }
+    if let Some(d) = duration_mins {
+        parts.push(format!("Duration: {d} mins"));
+    }
+    if let Some(r) = rounds {
+        parts.push(format!("Rounds: {r}"));
+    }
+    if let Some(ex) = exercises {
+        if !ex.is_empty() {
+            parts.push(format!("Exercises: {ex}"));
+        }
+    }
+    parts.join(" | ")
+}
+
+/// Spawns a background task to (re-)embed a single workout after create/update.
+fn spawn_workout_embedding(state: &AppState, workout_id: String) {
+    if state.voyage_api_key.is_empty() {
+        return;
+    }
+    let db = state.db.clone();
+    let http = state.http_client.clone();
+    let key = state.voyage_api_key.clone();
+    tokio::spawn(async move {
+        // Fetch workout row + exercises for text.
+        let row = sqlx::query(
+            r"SELECT w.name, w.workout_type, w.duration_mins, w.rounds,
+                     group_concat(e.name, ', ') AS exercise_names
+              FROM workouts w
+              LEFT JOIN workout_exercises we ON we.workout_id = w.id
+              LEFT JOIN exercises e ON e.id = we.exercise_id
+              WHERE w.id = ?
+              GROUP BY w.id",
+        )
+        .bind(&workout_id)
+        .fetch_optional(&db)
+        .await;
+
+        let row = match row {
+            Ok(Some(r)) => r,
+            Ok(None) => return,
+            Err(e) => {
+                tracing::warn!("spawn_workout_embedding fetch failed: {e}");
+                return;
+            }
+        };
+
+        let name: String = match row.try_get("name") {
+            Ok(v) => v,
+            Err(e) => { tracing::warn!("spawn_workout_embedding name: {e}"); return; }
+        };
+        let workout_type: Option<String> = row.try_get("workout_type").ok().flatten();
+        let duration_mins: Option<i64> = row.try_get("duration_mins").ok().flatten();
+        let rounds: Option<i64> = row.try_get("rounds").ok().flatten();
+        let exercises: Option<String> = row.try_get("exercise_names").ok().flatten();
+
+        let text = build_workout_text(&name, workout_type.as_deref(), duration_mins, rounds, exercises.as_deref());
+
+        match embeddings::generate_embedding(&http, &key, &text, "document").await {
+            Ok(emb) => {
+                if let Err(e) = embeddings::upsert_workout_embedding(&db, &workout_id, &emb).await {
+                    tracing::warn!("spawn_workout_embedding upsert failed: {e}");
+                }
+            }
+            Err(e) => tracing::warn!("spawn_workout_embedding voyage failed: {e}"),
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
@@ -940,8 +1122,12 @@ async fn build_workout_examples(db: &sqlx::SqlitePool, user_id: &str) -> ApiResu
             }
 
             let mut meta = String::new();
-            if let Some(d) = duration { meta.push_str(&format!(" {d}min")); }
-            if let Some(r) = rounds { meta.push_str(&format!(" {r}rounds")); }
+            if let Some(d) = duration {
+                write!(meta, " {d}min").expect("write to String");
+            }
+            if let Some(r) = rounds {
+                write!(meta, " {r}rounds").expect("write to String");
+            }
 
             type_lines.push(format!(
                 "  [{date}] {name}{meta}\n    {}",

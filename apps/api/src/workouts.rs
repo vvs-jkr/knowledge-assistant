@@ -251,6 +251,15 @@ pub struct GenerateWorkoutRequest {
     pub prompt: String,
 }
 
+/// Response from `POST /workouts/embed-all`.
+#[derive(Debug, Serialize)]
+pub struct EmbedAllResponse {
+    /// Workouts that were newly embedded.
+    pub embedded: usize,
+    /// Workouts skipped because an embedding already existed.
+    pub skipped: usize,
+}
+
 /// Response from `POST /workouts/generate`.
 #[derive(Debug, Serialize)]
 pub struct GeneratedWorkoutResponse {

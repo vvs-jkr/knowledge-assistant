@@ -104,7 +104,7 @@ async fn update_training_goals(
     )
     .bind(&claims.sub)
     .bind(&new_goals)
-    .bind(new_active as i64)
+    .bind(i64::from(new_active))
     .execute(&state.db)
     .await
     .map_err(AppError::from)?;
