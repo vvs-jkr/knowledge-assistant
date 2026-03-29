@@ -367,8 +367,8 @@ async fn embed_all_workouts(
         }
         let name: String = row.try_get("name").map_err(AppError::from)?;
         let workout_type: Option<String> = row.try_get("workout_type").map_err(AppError::from)?;
-        let duration_mins: Option<i64> = row.try_get("duration_mins").map_err(AppError::from)?;
-        let rounds: Option<i64> = row.try_get("rounds").map_err(AppError::from)?;
+        let duration_mins: Option<f64> = row.try_get("duration_mins").map_err(AppError::from)?;
+        let rounds: Option<f64> = row.try_get("rounds").map_err(AppError::from)?;
         let exercises: Option<String> = row.try_get("exercise_names").map_err(AppError::from)?;
         let text = build_workout_text(&name, workout_type.as_deref(), duration_mins, rounds, exercises.as_deref());
         to_embed.push((id, text));
@@ -734,8 +734,8 @@ async fn list_logs(
 fn build_workout_text(
     name: &str,
     workout_type: Option<&str>,
-    duration_mins: Option<i64>,
-    rounds: Option<i64>,
+    duration_mins: Option<f64>,
+    rounds: Option<f64>,
     exercises: Option<&str>,
 ) -> String {
     let mut parts = vec![format!("Workout: {name}")];
@@ -793,8 +793,8 @@ fn spawn_workout_embedding(state: &AppState, workout_id: String) {
             Err(e) => { tracing::warn!("spawn_workout_embedding name: {e}"); return; }
         };
         let workout_type: Option<String> = row.try_get("workout_type").ok().flatten();
-        let duration_mins: Option<i64> = row.try_get("duration_mins").ok().flatten();
-        let rounds: Option<i64> = row.try_get("rounds").ok().flatten();
+        let duration_mins: Option<f64> = row.try_get("duration_mins").ok().flatten();
+        let rounds: Option<f64> = row.try_get("rounds").ok().flatten();
         let exercises: Option<String> = row.try_get("exercise_names").ok().flatten();
 
         let text = build_workout_text(&name, workout_type.as_deref(), duration_mins, rounds, exercises.as_deref());

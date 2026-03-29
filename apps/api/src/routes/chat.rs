@@ -463,9 +463,9 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
                                     r.try_get("name").map_err(AppError::from)?;
                                 let wtype: Option<String> =
                                     r.try_get("workout_type").map_err(AppError::from)?;
-                                let duration: Option<i64> =
+                                let duration: Option<f64> =
                                     r.try_get("duration_mins").map_err(AppError::from)?;
-                                let rounds: Option<i64> =
+                                let rounds: Option<f64> =
                                     r.try_get("rounds").map_err(AppError::from)?;
                                 let exercises: Option<String> =
                                     r.try_get("exercise_names").map_err(AppError::from)?;
