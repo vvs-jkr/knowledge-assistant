@@ -8,6 +8,7 @@ export const workoutTypeSchema = z.enum([
   'tabata',
   'lifting',
   'rounds',
+  'wod',
   'other',
 ])
 

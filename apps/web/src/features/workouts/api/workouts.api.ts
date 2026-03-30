@@ -129,9 +129,9 @@ const workoutsApi = {
         return exerciseInfoSchema.array().parse(r.data)
       }),
 
-  create: (body: CreateWorkoutInput): Promise<WorkoutSummary> =>
-    api.post<WorkoutSummary>('/workouts', body).then((r) => {
-      return workoutSummarySchema.parse(r.data)
+  create: (body: CreateWorkoutInput): Promise<WorkoutDetail> =>
+    api.post<WorkoutDetail>('/workouts', body).then((r) => {
+      return workoutDetailSchema.parse(r.data)
     }),
 
   delete: (id: string): Promise<void> =>

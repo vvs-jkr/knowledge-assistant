@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// Valid values for the `workout_type` field.
 pub const VALID_WORKOUT_TYPES: &[&str] = &[
-    "for_time", "amrap", "emom", "tabata", "lifting", "rounds", "other",
+    "for_time", "amrap", "emom", "tabata", "lifting", "rounds", "wod", "other",
 ];
 
 /// Valid values for the `source_type` field.

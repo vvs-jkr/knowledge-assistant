@@ -36,6 +36,7 @@ const WORKOUT_TYPES: WorkoutType[] = [
   'tabata',
   'lifting',
   'rounds',
+  'wod',
   'other',
 ]
 
@@ -398,8 +399,8 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${WORKOUT_TYPE_BADGE_COLORS[workout.workout_type] ?? 'bg-zinc-100 text-zinc-600'}`}>
                     {WORKOUT_TYPE_LABELS[workout.workout_type] ?? workout.workout_type}
                   </span>
-                  {workout.duration_mins !== null && <span>{workout.duration_mins} мин</span>}
-                  {workout.rounds !== null && <span>{workout.rounds} раундов</span>}
+                  {!!workout.duration_mins && <span>{workout.duration_mins} мин</span>}
+                  {!!workout.rounds && <span>{workout.rounds} раундов</span>}
                 </>
               )}
             </div>

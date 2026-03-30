@@ -261,8 +261,8 @@ async fn update_workout(
             date            = COALESCE(?, date),
             name            = COALESCE(?, name),
             workout_type    = COALESCE(?, workout_type),
-            duration_mins   = CASE WHEN ? THEN ? ELSE duration_mins END,
-            rounds          = CASE WHEN ? THEN ? ELSE rounds END,
+            duration_mins   = ?,
+            rounds          = ?,
             source_type     = COALESCE(?, source_type),
             source_file     = CASE WHEN ? THEN ? ELSE source_file END,
             raw_text        = CASE WHEN ? THEN ? ELSE raw_text END,
@@ -273,9 +273,7 @@ async fn update_workout(
     .bind(body.date.as_deref())
     .bind(body.name.as_deref())
     .bind(body.workout_type.as_deref())
-    .bind(body.duration_mins.is_some())
     .bind(body.duration_mins)
-    .bind(body.rounds.is_some())
     .bind(body.rounds)
     .bind(body.source_type.as_deref())
     .bind(body.source_file.is_some())
@@ -1765,11 +1763,10 @@ async fn update_plan(
     }
 
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    let new_name: String = body
-        .name
-        .as_deref()
-        .map(str::trim)
-        .map_or_else(|| row.try_get("name").unwrap_or_default(), ToOwned::to_owned);
+    let new_name: String = body.name.as_deref().map(str::trim).map_or_else(
+        || row.try_get("name").unwrap_or_default(),
+        ToOwned::to_owned,
+    );
     let new_desc: String = body
         .description
         .unwrap_or_else(|| row.try_get("description").unwrap_or_default());

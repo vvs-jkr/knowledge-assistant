@@ -7,6 +7,7 @@ export const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
   tabata: 'Tabata',
   lifting: 'Lifting',
   rounds: 'Rounds',
+  wod: 'WOD',
   other: 'Other',
 }
 
@@ -17,6 +18,7 @@ export const WORKOUT_TYPE_BADGE_COLORS: Record<WorkoutType, string> = {
   tabata: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   lifting: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   rounds: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+  wod: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
   other: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
 }
 
@@ -27,6 +29,7 @@ export const WORKOUT_TYPE_BORDER_COLORS: Record<WorkoutType, string> = {
   tabata: 'border-l-orange-500',
   lifting: 'border-l-red-500',
   rounds: 'border-l-cyan-500',
+  wod: 'border-l-yellow-500',
   other: 'border-l-zinc-400',
 }
 
