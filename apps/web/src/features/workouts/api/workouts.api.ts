@@ -38,6 +38,7 @@ type ExerciseInput = {
 
 type UpdateExerciseInput = {
   exercise_id?: string
+  name?: string
   reps?: number
   sets?: number
   weight_kg?: number

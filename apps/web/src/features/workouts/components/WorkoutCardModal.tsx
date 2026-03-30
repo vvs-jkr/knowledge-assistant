@@ -9,7 +9,7 @@ import {
   normalizeWorkoutName,
 } from '@/features/workouts/utils/workout-display'
 import type { WorkoutExercise, WorkoutType } from '@/shared/schemas/workouts.schema'
-import { Pencil, Trash2, X } from 'lucide-react'
+import { Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -92,19 +92,38 @@ function NumField({
 function ExerciseEditRow({
   draft,
   onChange,
+  onRemove,
 }: {
   draft: ExerciseDraft
   onChange: (d: ExerciseDraft) => void
+  onRemove: () => void
 }) {
   return (
-    <div className="flex items-center gap-3 py-1">
-      <span className="min-w-0 flex-1 text-sm font-medium">{draft.name}</span>
+    <div className="flex items-start gap-2 py-1">
+      {draft.exercise_id ? (
+        <span className="min-w-0 flex-1 pt-0.5 text-sm font-medium">{draft.name}</span>
+      ) : (
+        <input
+          type="text"
+          value={draft.name}
+          onChange={(e) => onChange({ ...draft, name: e.target.value })}
+          placeholder="Упражнение"
+          className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+        />
+      )}
       <div className="flex shrink-0 flex-wrap gap-2">
         <NumField label="подх." value={draft.sets} onChange={(v) => onChange({ ...draft, sets: v })} />
         <NumField label="повт." value={draft.reps} onChange={(v) => onChange({ ...draft, reps: v })} />
         <NumField label="кг" value={draft.weight_kg} onChange={(v) => onChange({ ...draft, weight_kg: v })} />
         <NumField label="сек" value={draft.duration_secs} onChange={(v) => onChange({ ...draft, duration_secs: v })} />
       </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="mt-0.5 shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
     </div>
   )
 }
@@ -167,15 +186,17 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
         workout_type: workoutType,
         duration_mins: durationMins !== '' ? Number(durationMins) : null,
         rounds: rounds !== '' ? Number(rounds) : null,
-        exercises: exerciseDrafts.map((d) => ({
-          exercise_id: d.exercise_id,
-          ...(d.reps !== '' ? { reps: Number(d.reps) } : {}),
-          ...(d.sets !== '' ? { sets: Number(d.sets) } : {}),
-          ...(d.weight_kg !== '' ? { weight_kg: Number(d.weight_kg) } : {}),
-          ...(d.weight_note ? { weight_note: d.weight_note } : {}),
-          ...(d.duration_secs !== '' ? { duration_secs: Number(d.duration_secs) } : {}),
-          order_index: d.order_index,
-        })),
+        exercises: exerciseDrafts
+          .filter((d) => d.exercise_id || d.name.trim())
+          .map((d, i) => ({
+            ...(d.exercise_id ? { exercise_id: d.exercise_id } : { name: d.name.trim() }),
+            ...(d.reps !== '' ? { reps: Number(d.reps) } : {}),
+            ...(d.sets !== '' ? { sets: Number(d.sets) } : {}),
+            ...(d.weight_kg !== '' ? { weight_kg: Number(d.weight_kg) } : {}),
+            ...(d.weight_note ? { weight_note: d.weight_note } : {}),
+            ...(d.duration_secs !== '' ? { duration_secs: Number(d.duration_secs) } : {}),
+            order_index: i,
+          })),
       },
       { onSuccess: () => setEditing(false) },
     )
@@ -330,20 +351,36 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Упражнения
               </p>
-              {workout.exercises.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Нет упражнений</p>
-              ) : editing ? (
+              {editing ? (
                 <div className="space-y-1">
                   {exerciseDrafts.map((d, i) => (
                     <ExerciseEditRow
-                      key={d.exercise_id}
+                      key={d.exercise_id || `new-${i}`}
                       draft={d}
                       onChange={(updated) =>
                         setExerciseDrafts((prev) => prev.map((x, j) => (j === i ? updated : x)))
                       }
+                      onRemove={() =>
+                        setExerciseDrafts((prev) => prev.filter((_, j) => j !== i))
+                      }
                     />
                   ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExerciseDrafts((prev) => [
+                        ...prev,
+                        { exercise_id: '', name: '', sets: '', reps: '', weight_kg: '', weight_note: '', duration_secs: '', order_index: prev.length },
+                      ])
+                    }
+                    className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Добавить упражнение
+                  </button>
                 </div>
+              ) : workout.exercises.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Нет упражнений</p>
               ) : (
                 <div className="space-y-0.5">
                   {workout.exercises.map((ex) => (
