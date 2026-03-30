@@ -177,6 +177,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
   const [workoutType, setWorkoutType] = useState<WorkoutType>('other')
   const [durationMins, setDurationMins] = useState('')
   const [rounds, setRounds] = useState('')
+  const [rawText, setRawText] = useState('')
   const [exerciseDrafts, setExerciseDrafts] = useState<ExerciseDraft[]>([])
 
   const sensors = useSensors(
@@ -205,6 +206,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
       setWorkoutType(workout.workout_type)
       setDurationMins(workout.duration_mins !== null ? String(workout.duration_mins) : '')
       setRounds(workout.rounds !== null ? String(workout.rounds) : '')
+      setRawText(workout.raw_text ?? '')
       setExerciseDrafts(workout.exercises.map(toExerciseDraft))
     }
   }, [workout])
@@ -238,6 +240,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
         workout_type: workoutType,
         duration_mins: durationMins !== '' ? Number(durationMins) : null,
         rounds: rounds !== '' ? Number(rounds) : null,
+        raw_text: rawText.trim() || null,
         exercises: exerciseDrafts
           .filter((d) => d.exercise_id || d.name.trim())
           .map((d, i) => ({
@@ -261,6 +264,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
       setWorkoutType(workout.workout_type)
       setDurationMins(workout.duration_mins !== null ? String(workout.duration_mins) : '')
       setRounds(workout.rounds !== null ? String(workout.rounds) : '')
+      setRawText(workout.raw_text ?? '')
       setExerciseDrafts(workout.exercises.map(toExerciseDraft))
     }
     setEditing(false)
@@ -273,7 +277,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
         if (!open) onClose()
       }}
     >
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
         {isLoading || !workout ? (
           <div className="space-y-3 p-2">
             <Skeleton className="h-7 w-2/3" />
@@ -386,6 +390,18 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                 </>
               )}
             </div>
+
+            {editing ? (
+              <textarea
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                placeholder="Описание / структура (например: 2-4-6-8-10, EMOM 20 min...)"
+                rows={3}
+                className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+              />
+            ) : rawText ? (
+              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{rawText}</p>
+            ) : null}
 
             {editing && (
               <div className="flex gap-2">

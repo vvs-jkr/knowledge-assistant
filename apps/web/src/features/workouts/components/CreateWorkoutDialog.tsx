@@ -8,11 +8,31 @@ import {
 } from '@/components/ui/dialog'
 import { useCreateWorkout, usePlans } from '@/features/workouts/api/workouts.api'
 import { WORKOUT_TYPE_LABELS } from '@/features/workouts/utils/workout-display'
-import { Plus, Trash2 } from 'lucide-react'
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+let rowCounter = 0
+const newRowId = () => `row-${++rowCounter}`
+
 interface ExerciseRow {
+  id: string
   name: string
   sets: string
   reps: string
@@ -21,6 +41,7 @@ interface ExerciseRow {
 }
 
 const emptyExercise = (): ExerciseRow => ({
+  id: newRowId(),
   name: '',
   sets: '',
   reps: '',
@@ -29,6 +50,44 @@ const emptyExercise = (): ExerciseRow => ({
 })
 
 const today = () => new Date().toISOString().slice(0, 10)
+
+function SortableExerciseRow({
+  ex,
+  canRemove,
+  onChange,
+  onRemove,
+}: {
+  ex: ExerciseRow
+  index: number
+  canRemove: boolean
+  onChange: (field: keyof ExerciseRow, value: string) => void
+  onRemove: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: ex.id })
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-1">
+      <button type="button" {...attributes} {...listeners} className="shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing">
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <input
+        type="text"
+        value={ex.name}
+        onChange={(e) => onChange('name', e.target.value)}
+        placeholder="Упражнение"
+        className="min-w-0 flex-1 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+      />
+      <input type="text" inputMode="numeric" value={ex.sets} onChange={(e) => onChange('sets', e.target.value.replace(/[^\d]/g, ''))} placeholder="п." title="Подходы" className="w-10 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
+      <input type="text" inputMode="numeric" value={ex.reps} onChange={(e) => onChange('reps', e.target.value.replace(/[^\d]/g, ''))} placeholder="р." title="Повторения" className="w-10 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
+      <input type="text" inputMode="decimal" value={ex.weight_kg} onChange={(e) => onChange('weight_kg', e.target.value.replace(/[^\d.]/g, ''))} placeholder="кг" title="Вес (кг)" className="w-14 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
+      <input type="text" value={ex.weight_note} onChange={(e) => onChange('weight_note', e.target.value)} placeholder="заметка / время" title="Заметка (время, структура)" className="w-24 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
+      <button type="button" onClick={onRemove} disabled={!canRemove} className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive disabled:opacity-30">
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
 
 interface CreateWorkoutDialogProps {
   defaultPlanId?: string
@@ -48,6 +107,25 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
 
   const createWorkout = useCreateWorkout()
   const { data: plans } = usePlans()
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setExercises((prev) => {
+      const oldIndex = prev.findIndex((ex) => ex.id === active.id)
+      const newIndex = prev.findIndex((ex) => ex.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      const next = [...prev]
+      const [moved] = next.splice(oldIndex, 1)
+      next.splice(newIndex, 0, moved)
+      return next
+    })
+  }
 
   const addExercise = () => setExercises((prev) => [...prev, emptyExercise()])
   const removeExercise = (i: number) =>
@@ -118,7 +196,7 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-x-hidden overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Добавить тренировку</DialogTitle>
         </DialogHeader>
@@ -243,69 +321,23 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
                 Добавить
               </Button>
             </div>
-            <div className="space-y-2">
-              {exercises.map((ex, i) => (
-                <div
-                  key={`ex-${
-                    // biome-ignore lint/suspicious/noArrayIndexKey: order-based list
-                    i
-                  }`}
-                  className="grid grid-cols-[1fr_48px_48px_64px_80px_28px] gap-1 items-center"
-                >
-                  <input
-                    type="text"
-                    value={ex.name}
-                    onChange={(e) => updateExercise(i, 'name', e.target.value)}
-                    placeholder="Упражнение"
-                    className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={ex.sets}
-                    onChange={(e) => updateExercise(i, 'sets', e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="п."
-                    title="Подходы"
-                    className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={ex.reps}
-                    onChange={(e) => updateExercise(i, 'reps', e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="р."
-                    title="Повторения"
-                    className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={ex.weight_kg}
-                    onChange={(e) => updateExercise(i, 'weight_kg', e.target.value.replace(/[^\d.]/g, ''))}
-                    placeholder="кг"
-                    title="Вес (кг)"
-                    className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    type="text"
-                    value={ex.weight_note}
-                    onChange={(e) => updateExercise(i, 'weight_note', e.target.value)}
-                    placeholder="заметка"
-                    title="Заметка о весе"
-                    className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeExercise(i)}
-                    disabled={exercises.length === 1}
-                    className="flex items-center justify-center rounded p-1 text-muted-foreground hover:text-destructive disabled:opacity-30"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={exercises.map((ex) => ex.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {exercises.map((ex, i) => (
+                    <SortableExerciseRow
+                      key={ex.id}
+                      ex={ex}
+                      index={i}
+                      canRemove={exercises.length > 1}
+                      onChange={(field, value) => updateExercise(i, field, value)}
+                      onRemove={() => removeExercise(i)}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">п. = подходы, р. = повторения</p>
+              </SortableContext>
+            </DndContext>
+            <p className="mt-1 text-xs text-muted-foreground">п. = подходы, р. = повторения, заметка = время/структура</p>
           </div>
 
           <Button

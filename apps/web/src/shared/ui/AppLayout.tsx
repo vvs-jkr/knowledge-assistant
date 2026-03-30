@@ -20,6 +20,7 @@ export function AppLayout() {
         <main className="flex flex-1 overflow-hidden">
           <Outlet />
         </main>
+        <div className="h-4 shrink-0" />
       </div>
       <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>

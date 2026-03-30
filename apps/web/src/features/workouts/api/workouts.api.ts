@@ -53,6 +53,7 @@ type UpdateWorkoutInput = {
   workout_type?: string
   duration_mins?: number | null
   rounds?: number | null
+  raw_text?: string | null
   exercises?: UpdateExerciseInput[]
 }
 
