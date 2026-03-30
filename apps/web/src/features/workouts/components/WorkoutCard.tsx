@@ -2,7 +2,6 @@ import {
   WORKOUT_TYPE_BADGE_COLORS,
   WORKOUT_TYPE_BORDER_COLORS,
   WORKOUT_TYPE_LABELS,
-  normalizeWorkoutName,
 } from '@/features/workouts/utils/workout-display'
 import type { WorkoutSummary, WorkoutType } from '@/shared/schemas/workouts.schema'
 import { Dumbbell } from 'lucide-react'
@@ -26,7 +25,7 @@ export function WorkoutCard({ workout, onClick }: { workout: WorkoutSummary; onC
       </div>
 
       <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
-        {normalizeWorkoutName(workout.name)}
+        {workout.name}
       </p>
 
       <div className="mt-auto flex items-center gap-3 text-xs text-muted-foreground">

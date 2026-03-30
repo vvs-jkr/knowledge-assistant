@@ -410,8 +410,8 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
                 placeholder="Описание / структура (например: 2-4-6-8-10, EMOM 20 min...)"
-                rows={3}
-                className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                className="w-full resize-y overflow-y-auto rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                style={{ minHeight: '4.5rem', maxHeight: '15rem' }}
               />
             ) : rawText ? (
               <div>
@@ -428,18 +428,6 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                 )}
               </div>
             ) : null}
-
-            {editing && (
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleSave} disabled={updateWorkout.isPending}>
-                  Сохранить
-                </Button>
-                <Button size="sm" variant="ghost" onClick={handleCancel}>
-                  <X className="mr-1 h-3.5 w-3.5" />
-                  Отмена
-                </Button>
-              </div>
-            )}
 
             <div className="pt-1">
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -496,6 +484,18 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                 )
               )}
             </div>
+
+            {editing && (
+              <div className="flex justify-end gap-2 pt-1">
+                <Button size="sm" variant="ghost" onClick={handleCancel}>
+                  <X className="mr-1 h-3.5 w-3.5" />
+                  Отмена
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={updateWorkout.isPending}>
+                  Сохранить
+                </Button>
+              </div>
+            )}
           </>
         )}
       </DialogContent>
