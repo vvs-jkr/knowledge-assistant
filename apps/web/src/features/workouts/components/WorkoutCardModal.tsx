@@ -9,7 +9,23 @@ import {
   normalizeWorkoutName,
 } from '@/features/workouts/utils/workout-display'
 import type { WorkoutExercise, WorkoutType } from '@/shared/schemas/workouts.schema'
-import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -90,37 +106,53 @@ function NumField({
 }
 
 function ExerciseEditRow({
+  id,
   draft,
   onChange,
   onRemove,
 }: {
+  id: string
   draft: ExerciseDraft
   onChange: (d: ExerciseDraft) => void
   onRemove: () => void
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
   return (
-    <div className="flex items-start gap-2 py-1">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2 py-1">
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
       {draft.exercise_id ? (
-        <span className="min-w-0 flex-1 pt-0.5 text-sm font-medium">{draft.name}</span>
+        <span className="min-w-0 flex-1 text-sm font-medium">{draft.name}</span>
       ) : (
         <input
           type="text"
           value={draft.name}
           onChange={(e) => onChange({ ...draft, name: e.target.value })}
-          placeholder="Упражнение"
-          className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+          placeholder="Название упражнения"
+          className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
         />
       )}
-      <div className="flex shrink-0 flex-wrap gap-2">
+      <div className="flex shrink-0 gap-3">
         <NumField label="подх." value={draft.sets} onChange={(v) => onChange({ ...draft, sets: v })} />
         <NumField label="повт." value={draft.reps} onChange={(v) => onChange({ ...draft, reps: v })} />
         <NumField label="кг" value={draft.weight_kg} onChange={(v) => onChange({ ...draft, weight_kg: v })} />
-        <NumField label="сек" value={draft.duration_secs} onChange={(v) => onChange({ ...draft, duration_secs: v })} />
       </div>
       <button
         type="button"
         onClick={onRemove}
-        className="mt-0.5 shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
+        className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>
@@ -145,6 +177,25 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
   const [durationMins, setDurationMins] = useState('')
   const [rounds, setRounds] = useState('')
   const [exerciseDrafts, setExerciseDrafts] = useState<ExerciseDraft[]>([])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setExerciseDrafts((prev) => {
+      const oldIndex = prev.findIndex((_, i) => (prev[i].exercise_id || `new-${i}`) === active.id)
+      const newIndex = prev.findIndex((_, i) => (prev[i].exercise_id || `new-${i}`) === over.id)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      const next = [...prev]
+      const [moved] = next.splice(oldIndex, 1)
+      next.splice(newIndex, 0, moved)
+      return next
+    })
+  }
 
   useEffect(() => {
     if (workout) {
@@ -221,7 +272,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
         if (!open) onClose()
       }}
     >
-      <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         {isLoading || !workout ? (
           <div className="space-y-3 p-2">
             <Skeleton className="h-7 w-2/3" />
@@ -352,19 +403,30 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                 Упражнения
               </p>
               {editing ? (
-                <div className="space-y-1">
-                  {exerciseDrafts.map((d, i) => (
-                    <ExerciseEditRow
-                      key={d.exercise_id || `new-${i}`}
-                      draft={d}
-                      onChange={(updated) =>
-                        setExerciseDrafts((prev) => prev.map((x, j) => (j === i ? updated : x)))
-                      }
-                      onRemove={() =>
-                        setExerciseDrafts((prev) => prev.filter((_, j) => j !== i))
-                      }
-                    />
-                  ))}
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext
+                    items={exerciseDrafts.map((d, i) => d.exercise_id || `new-${i}`)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-1">
+                      {exerciseDrafts.map((d, i) => (
+                        <ExerciseEditRow
+                          key={d.exercise_id || `new-${i}`}
+                          id={d.exercise_id || `new-${i}`}
+                          draft={d}
+                          onChange={(updated) =>
+                            setExerciseDrafts((prev) => prev.map((x, j) => (j === i ? updated : x)))
+                          }
+                          onRemove={() =>
+                            setExerciseDrafts((prev) => prev.filter((_, j) => j !== i))
+                          }
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : undefined}
+              {editing && (
                   <button
                     type="button"
                     onClick={() =>
@@ -378,15 +440,17 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                     <Plus className="h-3 w-3" />
                     Добавить упражнение
                   </button>
-                </div>
-              ) : workout.exercises.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Нет упражнений</p>
-              ) : (
-                <div className="space-y-0.5">
-                  {workout.exercises.map((ex) => (
-                    <ExerciseViewRow key={ex.id} ex={ex} />
-                  ))}
-                </div>
+              )}
+              {!editing && (
+                workout.exercises.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Нет упражнений</p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {workout.exercises.map((ex) => (
+                      <ExerciseViewRow key={ex.id} ex={ex} />
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </>
