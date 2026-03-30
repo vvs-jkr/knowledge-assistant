@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import type { ChatMessage } from '@/shared/schemas/chat.schema'
 import { Send } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 
 interface Props {
   sessionId: string
@@ -22,6 +23,13 @@ export function ChatWindow({ sessionId }: Props) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
   }, [lastMessageId])
+
+  const handleResize = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto'
+    const maxHeight = 20 * 5 + 16 // 5 lines + padding
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }
 
   const handleSend = () => {
     const content = input.trim()
@@ -76,10 +84,14 @@ export function ChatWindow({ sessionId }: Props) {
       </ScrollArea>
 
       <div className="border-t bg-card px-4 py-3">
-        <div className="flex gap-2">
+        <TokenCounter messages={messages} />
+        <div className="flex items-end gap-2">
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value)
+              handleResize(e.target)
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Напиши вопрос... (Enter -- отправить, Shift+Enter -- новая строка)"
             rows={1}
@@ -90,11 +102,45 @@ export function ChatWindow({ sessionId }: Props) {
             size="icon"
             onClick={handleSend}
             disabled={!input.trim() || sendMessage.isPending}
+            className="shrink-0"
           >
             <Send className="h-4 w-4" />
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+const CONTEXT_LIMIT = 180_000 // ~200k tokens, leave buffer
+
+function TokenCounter({ messages }: { messages: ChatMessage[] }) {
+  if (messages.length === 0) return null
+  const approx = Math.round(messages.reduce((sum, m) => sum + m.content.length, 0) / 4)
+  const pct = Math.min(100, (approx / CONTEXT_LIMIT) * 100)
+  const isWarn = pct > 60
+  const isCrit = pct > 85
+
+  return (
+    <div className="mb-2 flex items-center gap-2">
+      <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn(
+            'h-full rounded-full transition-all',
+            isCrit ? 'bg-destructive' : isWarn ? 'bg-orange-500' : 'bg-success'
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span
+        className={cn(
+          'shrink-0 text-xs tabular-nums text-muted-foreground',
+          isCrit && 'text-destructive',
+          isWarn && 'text-orange-500'
+        )}
+      >
+        ~{approx.toLocaleString()} / {CONTEXT_LIMIT.toLocaleString()} токенов
+      </span>
     </div>
   )
 }
@@ -105,13 +151,19 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[75%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap',
+          'max-w-[75%] rounded-2xl px-4 py-2.5 text-sm',
           isUser
             ? 'rounded-tr-sm bg-primary text-primary-foreground'
             : 'rounded-tl-sm bg-muted text-foreground'
         )}
       >
-        {message.content}
+        {isUser ? (
+          <span className="whitespace-pre-wrap">{message.content}</span>
+        ) : (
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -113,7 +113,7 @@ export function MetricsChart({ params }: MetricsChartProps) {
   }
 
   return (
-    <div className="space-y-8 p-4">
+    <div className="grid grid-cols-1 gap-6 p-4 lg:grid-cols-2">
       {[...byMetric.keys()].map((name) => {
         const data = byMetric.get(name) ?? []
         const info = getInfo(name)
