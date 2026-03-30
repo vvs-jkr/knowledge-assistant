@@ -6,7 +6,6 @@ import { useDeleteWorkout, useUpdateWorkout, useWorkout } from '@/features/worko
 import {
   WORKOUT_TYPE_BADGE_COLORS,
   WORKOUT_TYPE_LABELS,
-  normalizeWorkoutName,
 } from '@/features/workouts/utils/workout-display'
 import type { WorkoutExercise, WorkoutType } from '@/shared/schemas/workouts.schema'
 import {
@@ -186,6 +185,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
   const [durationMins, setDurationMins] = useState('')
   const [rounds, setRounds] = useState('')
   const [rawText, setRawText] = useState('')
+  const [rawTextOpen, setRawTextOpen] = useState(false)
   const [exerciseDrafts, setExerciseDrafts] = useState<ExerciseDraft[]>([])
 
   const sensors = useSensors(
@@ -303,7 +303,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                     className="text-lg font-semibold"
                   />
                 ) : (
-                  <DialogTitle className="text-xl leading-tight">{normalizeWorkoutName(workout.name)}</DialogTitle>
+                  <DialogTitle className="text-xl leading-tight">{workout.name}</DialogTitle>
                 )}
                 {!editing && (
                   <div className="flex shrink-0 items-center gap-1">
@@ -414,7 +414,19 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                 className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               />
             ) : rawText ? (
-              <p className="whitespace-pre-wrap text-sm text-muted-foreground">{rawText}</p>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setRawTextOpen((o) => !o)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <span>{rawTextOpen ? '▾' : '▸'}</span>
+                  <span>Описание тренировки</span>
+                </button>
+                {rawTextOpen && (
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{rawText}</p>
+                )}
+              </div>
             ) : null}
 
             {editing && (
