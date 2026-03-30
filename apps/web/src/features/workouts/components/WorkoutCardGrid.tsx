@@ -70,9 +70,17 @@ export function WorkoutCardGrid() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span>
-              {page + 1} / {totalPages}
-            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={page + 1}
+              onChange={(e) => {
+                const val = Number(e.target.value.replace(/[^\d]/g, ''))
+                if (val >= 1 && val <= totalPages) setPage(val - 1)
+              }}
+              className="w-10 rounded border border-input bg-background px-1 py-0.5 text-center text-sm outline-none focus:ring-1 focus:ring-ring"
+            />
+            <span className="text-muted-foreground">/ {totalPages}</span>
             <Button
               variant="ghost"
               size="icon"

@@ -138,17 +138,13 @@ function ExerciseEditRow({
       >
         <GripVertical className="h-4 w-4" />
       </button>
-      {draft.exercise_id ? (
-        <span className="min-w-0 flex-1 text-sm font-medium">{draft.name}</span>
-      ) : (
-        <input
-          type="text"
-          value={draft.name}
-          onChange={(e) => onChange({ ...draft, name: e.target.value })}
-          placeholder="Название упражнения"
-          className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-        />
-      )}
+      <input
+        type="text"
+        value={draft.name}
+        onChange={(e) => onChange({ ...draft, name: e.target.value, exercise_id: '' })}
+        placeholder="Название упражнения"
+        className="min-w-0 flex-1 rounded border border-input bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+      />
       <div className="flex shrink-0 gap-3">
         <NumField label="подх." value={draft.sets} onChange={(v) => onChange({ ...draft, sets: v })} />
         <NumField label="повт." value={draft.reps} onChange={(v) => onChange({ ...draft, reps: v })} />
