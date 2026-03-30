@@ -16,7 +16,7 @@ interface VolumeBarChartProps {
 
 function formatWeekStart(dateStr: string): string {
   const d = new Date(dateStr)
-  return d.toLocaleString('default', { month: 'short', day: 'numeric' })
+  return d.toLocaleString('ru', { month: 'short', day: 'numeric' })
 }
 
 export function VolumeBarChart({ data }: VolumeBarChartProps) {
@@ -34,8 +34,8 @@ export function VolumeBarChart({ data }: VolumeBarChartProps) {
         <YAxis tick={{ fontSize: 11 }} width={48} />
         <Tooltip />
         <Legend />
-        <Bar dataKey="volume" fill="hsl(var(--chart-1))" name="Volume" />
-        <Bar dataKey="workouts" fill="hsl(var(--chart-2))" name="Workouts" />
+        <Bar dataKey="volume" fill="hsl(var(--chart-1))" name="Объём" />
+        <Bar dataKey="workouts" fill="hsl(var(--chart-2))" name="Тренировки" />
       </BarChart>
     </ResponsiveContainer>
   )

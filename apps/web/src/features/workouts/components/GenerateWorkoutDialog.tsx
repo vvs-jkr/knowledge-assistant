@@ -34,8 +34,8 @@ function DraftPreview({ draft }: { draft: WorkoutDraft }) {
             <span className="font-medium">{ex.name}</span>
             <span className="text-muted-foreground">
               {[
-                ex.sets !== null ? `${ex.sets} sets` : null,
-                ex.reps !== null ? `× ${ex.reps}` : null,
+                ex.sets !== null ? `${ex.sets} подх.` : null,
+                ex.reps !== null ? `x ${ex.reps} повт.` : null,
                 ex.weight_note,
               ]
                 .filter(Boolean)
@@ -58,7 +58,7 @@ export function GenerateWorkoutDialog() {
   const handleGenerate = () => {
     if (!prompt.trim()) return
     generate.mutate(prompt.trim(), {
-      onError: () => toast.error('Generation failed'),
+      onError: () => toast.error('Ошибка генерации'),
     })
   }
 
@@ -84,12 +84,12 @@ export function GenerateWorkoutDialog() {
         })),
       })
       await qc.invalidateQueries({ queryKey: ['workouts'] })
-      toast.success('Workout saved')
+      toast.success('Тренировка сохранена')
       setOpen(false)
       setPrompt('')
       generate.reset()
     } catch {
-      toast.error('Failed to save workout')
+      toast.error('Ошибка сохранения')
     } finally {
       setSaving(false)
     }
@@ -108,19 +108,19 @@ export function GenerateWorkoutDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Sparkles className="mr-2 h-4 w-4" />
-          Generate
+          Сгенерировать
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Generate Workout</DialogTitle>
+          <DialogTitle>Генерация тренировки</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the workout you want… e.g. &quot;Upper body push day, 45 min, moderate intensity&quot;"
+            placeholder="Опишите тренировку... например: &quot;Верх тела, 45 мин, средняя интенсивность&quot;"
             rows={3}
             disabled={generate.isPending || generate.isSuccess}
             className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 resize-none"
@@ -132,7 +132,7 @@ export function GenerateWorkoutDialog() {
               onClick={handleGenerate}
               disabled={!prompt.trim() || generate.isPending}
             >
-              {generate.isPending ? 'Generating…' : 'Generate'}
+              {generate.isPending ? 'Генерирую...' : 'Сгенерировать'}
             </Button>
           )}
 
@@ -147,7 +147,7 @@ export function GenerateWorkoutDialog() {
           )}
 
           {generate.isError && (
-            <p className="text-sm text-destructive">Generation failed. Try again.</p>
+            <p className="text-sm text-destructive">Ошибка генерации. Попробуйте ещё раз.</p>
           )}
 
           {generate.isSuccess && generate.data && (
@@ -162,10 +162,10 @@ export function GenerateWorkoutDialog() {
                     setPrompt('')
                   }}
                 >
-                  Regenerate
+                  Сгенерировать заново
                 </Button>
                 <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                  {saving ? 'Saving…' : 'Save as workout'}
+                  {saving ? 'Сохраняю...' : 'Сохранить тренировку'}
                 </Button>
               </div>
             </>

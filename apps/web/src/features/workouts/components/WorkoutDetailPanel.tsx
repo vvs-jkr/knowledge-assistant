@@ -27,7 +27,7 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
   if (!workout) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        Workout not found
+        Тренировка не найдена
       </div>
     )
   }
@@ -42,8 +42,8 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>{workout.date}</span>
         <Badge variant="secondary">{workout.workout_type}</Badge>
-        {workout.duration_mins !== null && <span>{workout.duration_mins} min</span>}
-        {workout.rounds !== null && <span>{workout.rounds} rounds</span>}
+        {workout.duration_mins !== null && <span>{workout.duration_mins} мин</span>}
+        {workout.rounds !== null && <span>{workout.rounds} раундов</span>}
       </div>
 
       <WorkoutExerciseList exercises={workout.exercises} />
@@ -60,7 +60,7 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
             ) : (
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             )}
-            {showRaw ? 'Hide original' : 'Show original'}
+            {showRaw ? 'Скрыть оригинал' : 'Показать оригинал'}
           </button>
           {showRaw && (
             <pre className="overflow-auto px-4 pb-4 text-xs text-muted-foreground whitespace-pre-wrap">

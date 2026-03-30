@@ -6,7 +6,15 @@ import {
 import type { WorkoutSummary, WorkoutType } from '@/shared/schemas/workouts.schema'
 import { Dumbbell } from 'lucide-react'
 
-export function WorkoutCard({ workout, onClick }: { workout: WorkoutSummary; onClick: () => void }) {
+export function WorkoutCard({
+  workout,
+  onClick,
+  isCompleted,
+}: {
+  workout: WorkoutSummary
+  onClick: () => void
+  isCompleted?: boolean
+}) {
   const type = workout.workout_type as WorkoutType
   const borderColor = WORKOUT_TYPE_BORDER_COLORS[type] ?? 'border-l-zinc-400'
   const badgeColor = WORKOUT_TYPE_BADGE_COLORS[type] ?? 'bg-zinc-100 text-zinc-600'
@@ -15,7 +23,7 @@ export function WorkoutCard({ workout, onClick }: { workout: WorkoutSummary; onC
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col gap-2 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:shadow-md hover:border-foreground/20 border-l-4 ${borderColor}`}
+      className={`flex flex-col gap-2 rounded-xl border border-border p-4 text-left shadow-sm transition-all hover:shadow-md hover:border-foreground/20 border-l-4 ${borderColor} ${isCompleted ? 'bg-green-50/60 dark:bg-green-950/30' : 'bg-card'}`}
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-medium text-muted-foreground">{workout.date}</span>

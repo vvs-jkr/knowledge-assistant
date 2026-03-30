@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useWorkouts } from '@/features/workouts/api/workouts.api'
+import { useWorkoutLogs, useWorkouts } from '@/features/workouts/api/workouts.api'
 import { WorkoutCard } from '@/features/workouts/components/WorkoutCard'
 import { WorkoutCardModal } from '@/features/workouts/components/WorkoutCardModal'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
@@ -22,6 +22,8 @@ export function WorkoutCardGrid() {
   }
 
   const { data: workouts, isLoading } = useWorkouts(queryParams)
+  const { data: logs } = useWorkoutLogs({ limit: 1000 })
+  const completedIds = new Set(logs?.map((l) => l.workout_id) ?? [])
 
   if (isLoading) {
     return (
@@ -49,7 +51,7 @@ export function WorkoutCardGrid() {
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {pageItems.map((w) => (
-            <WorkoutCard key={w.id} workout={w} onClick={() => setSelectedId(w.id)} />
+            <WorkoutCard key={w.id} workout={w} onClick={() => setSelectedId(w.id)} isCompleted={completedIds.has(w.id)} />
           ))}
         </div>
       </div>

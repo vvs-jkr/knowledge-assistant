@@ -42,7 +42,7 @@ export function WorkoutAnalysisDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <BrainCircuit className="h-4 w-4" />
-          Analyze
+          Анализ
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">

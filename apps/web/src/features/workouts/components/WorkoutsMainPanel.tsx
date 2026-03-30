@@ -32,14 +32,14 @@ export function WorkoutsMainPanel() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {tab === 'list' ? 'Workouts' : tab === 'cards' ? 'Карточки' : tab === 'stats' ? 'Stats' : 'Планы'}
+              {tab === 'list' ? 'Таблица' : tab === 'cards' ? 'Карточки' : tab === 'stats' ? 'Статистика' : 'Планы'}
             </button>
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <WorkoutAnalysisDialog />
           <CreateWorkoutDialog />
           <GenerateWorkoutDialog />
+          <WorkoutAnalysisDialog />
         </div>
       </div>
 

@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useDeleteWorkout, useUpdateWorkout, useWorkout } from '@/features/workouts/api/workouts.api'
+import { useCreateWorkoutLog, useDeleteWorkout, useUpdateWorkout, useWorkout } from '@/features/workouts/api/workouts.api'
 import {
   WORKOUT_TYPE_BADGE_COLORS,
   WORKOUT_TYPE_LABELS,
@@ -24,7 +24,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { CheckCircle, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -177,6 +177,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
   const { data: workout, isLoading } = useWorkout(workoutId ?? '')
   const updateWorkout = useUpdateWorkout()
   const deleteWorkout = useDeleteWorkout()
+  const createLog = useCreateWorkoutLog()
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [name, setName] = useState('')
@@ -307,6 +308,23 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                 )}
                 {!editing && (
                   <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs text-green-600 hover:text-green-600 dark:text-green-400"
+                      disabled={createLog.isPending}
+                      onClick={() => {
+                        if (!workout) return
+                        const today = new Date().toISOString().slice(0, 10)
+                        createLog.mutate(
+                          { workout_id: workout.id, completed_at: today },
+                          { onSuccess: () => toast.success('Выполнено!') },
+                        )
+                      }}
+                    >
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Выполнено
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

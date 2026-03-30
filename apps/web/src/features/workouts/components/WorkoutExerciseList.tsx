@@ -9,7 +9,7 @@ export function WorkoutExerciseList({ exercises }: WorkoutExerciseListProps) {
   if (exercises.length === 0) {
     return (
       <div className="flex h-20 items-center justify-center text-sm text-muted-foreground">
-        No exercises recorded
+        Нет упражнений
       </div>
     )
   }
@@ -29,12 +29,12 @@ export function WorkoutExerciseList({ exercises }: WorkoutExerciseListProps) {
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {ex.reps !== null && ex.sets !== null && (
               <span>
-                {ex.reps} reps × {ex.sets} sets
+                {ex.reps} повт. x {ex.sets} подх.
               </span>
             )}
-            {ex.reps !== null && ex.sets === null && <span>{ex.reps} reps</span>}
-            {ex.reps === null && ex.sets !== null && <span>{ex.sets} sets</span>}
-            {ex.weight_kg !== null && <span>· {ex.weight_kg} kg</span>}
+            {ex.reps !== null && ex.sets === null && <span>{ex.reps} повт.</span>}
+            {ex.reps === null && ex.sets !== null && <span>{ex.sets} подх.</span>}
+            {ex.weight_kg !== null && <span>· {ex.weight_kg} кг</span>}
             {ex.weight_note !== null && <span>· {ex.weight_note}</span>}
             {ex.duration_secs !== null && <span>· {ex.duration_secs}s</span>}
             {ex.notes !== null && <span className="italic">({ex.notes})</span>}

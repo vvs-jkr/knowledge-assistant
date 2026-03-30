@@ -30,17 +30,17 @@ const columnHelper = createColumnHelper<WorkoutSummary>()
 
 const columns = [
   columnHelper.accessor('date', {
-    header: 'Date',
+    header: 'Дата',
     cell: (info) => info.getValue(),
     enableSorting: true,
   }),
   columnHelper.accessor('name', {
-    header: 'Name',
+    header: 'Название',
     cell: (info) => info.getValue(),
     enableSorting: true,
   }),
   columnHelper.accessor('workout_type', {
-    header: 'Type',
+    header: 'Тип',
     cell: (info) => <Badge variant="secondary">{info.getValue()}</Badge>,
   }),
 ]
@@ -85,7 +85,7 @@ export function WorkoutTable() {
   if (!workouts?.length) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No workouts found
+        Тренировки не найдены
       </div>
     )
   }
@@ -151,7 +151,7 @@ export function WorkoutTable() {
       {totalPages > 1 && (
         <div className="flex shrink-0 items-center justify-between border-t px-4 py-2 text-sm text-muted-foreground">
           <span>
-            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, allRows.length)} of{' '}
+            {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, allRows.length)} из{' '}
             {allRows.length}
           </span>
           <div className="flex items-center gap-1">

@@ -58,18 +58,18 @@ export function LogWorkoutDialog({ workoutId, workoutName }: LogWorkoutDialogPro
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          Log Result
+          Записать результат
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Log Workout Result</DialogTitle>
-          <DialogDescription>Record your completion of {workoutName}.</DialogDescription>
+          <DialogTitle>Результат тренировки</DialogTitle>
+          <DialogDescription>Запись выполнения: {workoutName}.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="log-completed-at" className="text-sm font-medium">
-              Date
+              Дата
             </label>
             <input
               id="log-completed-at"
@@ -83,7 +83,7 @@ export function LogWorkoutDialog({ workoutId, workoutName }: LogWorkoutDialogPro
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="log-duration" className="text-sm font-medium">
-              Duration (seconds, optional)
+              Длительность (сек, необязательно)
             </label>
             <input
               id="log-duration"
@@ -91,14 +91,14 @@ export function LogWorkoutDialog({ workoutId, workoutName }: LogWorkoutDialogPro
               min="0"
               value={durationSecs}
               onChange={(e) => setDurationSecs(e.target.value)}
-              placeholder="e.g. 1800"
+              placeholder="например, 1800"
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="log-rounds" className="text-sm font-medium">
-              Rounds completed (optional)
+              Раундов выполнено (необязательно)
             </label>
             <input
               id="log-rounds"
@@ -106,35 +106,35 @@ export function LogWorkoutDialog({ workoutId, workoutName }: LogWorkoutDialogPro
               min="0"
               value={roundsCompleted}
               onChange={(e) => setRoundsCompleted(e.target.value)}
-              placeholder="e.g. 5"
+              placeholder="например, 5"
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="log-notes" className="text-sm font-medium">
-              Notes (optional)
+              Заметки (необязательно)
             </label>
             <textarea
               id="log-notes"
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="How did it go?"
+              placeholder="Как прошло?"
               className="flex w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
 
           {logMutation.isError && (
-            <p className="text-sm text-destructive">Failed to log workout. Please try again.</p>
+            <p className="text-sm text-destructive">Ошибка сохранения. Попробуйте ещё раз.</p>
           )}
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => handleOpen(false)}>
-              Cancel
+              Отмена
             </Button>
             <Button type="submit" size="sm" disabled={logMutation.isPending}>
-              {logMutation.isPending ? 'Saving…' : 'Save'}
+              {logMutation.isPending ? 'Сохраняю...' : 'Сохранить'}
             </Button>
           </div>
         </form>

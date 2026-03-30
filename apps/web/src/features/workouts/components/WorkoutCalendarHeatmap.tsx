@@ -26,7 +26,7 @@ function buildHeatmapGrid(data: HeatmapEntry[], weeks = 26): GridCell[][] {
   const startDate = new Date(endDate)
   startDate.setDate(startDate.getDate() - weeks * 7 + 1)
 
-  // Build weeks × days matrix (row = day of week 0-6, col = week)
+  // Build weeks x days matrix (row = day of week 0-6, col = week)
   const cols: GridCell[][] = []
 
   const cursor = new Date(startDate)
@@ -53,7 +53,7 @@ function cellColorClass(count: number): string {
   return 'bg-[hsl(var(--chart-1))]'
 }
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DAY_LABELS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
 const SHOW_DAY_LABELS = [1, 3, 5] // Mon, Wed, Fri indices
 
 function getMonthLabels(cols: GridCell[][]): { label: string; colIndex: number }[] {
@@ -66,7 +66,7 @@ function getMonthLabels(cols: GridCell[][]): { label: string; colIndex: number }
       const month = new Date(firstCell.date).getMonth()
       if (month !== lastMonth) {
         labels.push({
-          label: new Date(firstCell.date).toLocaleString('default', { month: 'short' }),
+          label: new Date(firstCell.date).toLocaleString('ru', { month: 'short' }),
           colIndex: i,
         })
         lastMonth = month
@@ -125,7 +125,7 @@ export function WorkoutCalendarHeatmap({ data }: WorkoutCalendarHeatmapProps) {
                     className={`h-4 w-4 rounded-sm ${cell ? cellColorClass(cell.count) : 'bg-muted'}`}
                     title={
                       cell
-                        ? `${cell.date}: ${cell.count} ${cell.count === 1 ? 'workout' : 'workouts'}`
+                        ? `${cell.date}: ${cell.count} ${cell.count === 1 ? 'тренировка' : cell.count < 5 ? 'тренировки' : 'тренировок'}`
                         : ''
                     }
                   />

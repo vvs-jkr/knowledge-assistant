@@ -8,7 +8,7 @@ export const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
   lifting: 'Lifting',
   rounds: 'Rounds',
   wod: 'WOD',
-  other: 'Other',
+  other: 'Другое',
 }
 
 export const WORKOUT_TYPE_BADGE_COLORS: Record<WorkoutType, string> = {

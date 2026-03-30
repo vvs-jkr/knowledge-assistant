@@ -25,14 +25,14 @@ export function ExerciseProgressChart({ data, exerciseName }: ExerciseProgressCh
   if (chartData.length === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        No weight data for {exerciseName}
+        Нет данных о весе для {exerciseName}
       </div>
     )
   }
 
   return (
     <div>
-      <p className="mb-2 text-sm font-medium">{exerciseName} — Max Weight (kg)</p>
+      <p className="mb-2 text-sm font-medium">{exerciseName} -- Макс. вес (кг)</p>
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
