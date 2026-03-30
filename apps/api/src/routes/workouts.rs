@@ -63,7 +63,9 @@ async fn list_workouts(
     let offset = params.offset.unwrap_or(0);
 
     let rows = sqlx::query(
-        r"SELECT w.id, w.date, w.name, w.workout_type, w.duration_mins, w.rounds,
+        r"SELECT w.id, w.date, w.name, w.workout_type,
+                 CAST(w.duration_mins AS INTEGER) AS duration_mins,
+                 CAST(w.rounds AS INTEGER) AS rounds,
                  w.source_type, w.plan_id, w.created_at,
                  COUNT(we.id) AS exercise_count
           FROM workouts w
@@ -871,7 +873,9 @@ async fn fetch_workout_detail(
     user_id: &str,
 ) -> ApiResult<WorkoutDetail> {
     let row = sqlx::query(
-        r"SELECT id, date, name, workout_type, duration_mins, rounds,
+        r"SELECT id, date, name, workout_type,
+                 CAST(duration_mins AS INTEGER) AS duration_mins,
+                 CAST(rounds AS INTEGER) AS rounds,
                  source_type, source_file, raw_text, year_confidence, plan_id, created_at, updated_at
           FROM workouts
           WHERE id = ? AND user_id = ?",
@@ -947,7 +951,9 @@ async fn fetch_plan_workouts(
     user_id: &str,
 ) -> ApiResult<Vec<WorkoutSummary>> {
     let rows = sqlx::query(
-        r"SELECT w.id, w.date, w.name, w.workout_type, w.duration_mins, w.rounds,
+        r"SELECT w.id, w.date, w.name, w.workout_type,
+                 CAST(w.duration_mins AS INTEGER) AS duration_mins,
+                 CAST(w.rounds AS INTEGER) AS rounds,
                  w.source_type, w.plan_id, w.created_at,
                  COUNT(we.id) AS exercise_count
           FROM workouts w
@@ -1074,7 +1080,7 @@ pub async fn format_workouts_compact(
     limit: i64,
 ) -> ApiResult<String> {
     let workout_rows = sqlx::query(
-        "SELECT id, date, name, workout_type, duration_mins FROM workouts \
+        "SELECT id, date, name, workout_type, CAST(duration_mins AS INTEGER) AS duration_mins FROM workouts \
          WHERE user_id = ? ORDER BY date DESC LIMIT ?",
     )
     .bind(user_id)
@@ -1153,7 +1159,7 @@ async fn build_workout_examples(db: &sqlx::SqlitePool, user_id: &str) -> ApiResu
 
     for wtype in types {
         let rows = sqlx::query(
-            "SELECT id, date, name, duration_mins, rounds FROM workouts \
+            "SELECT id, date, name, CAST(duration_mins AS INTEGER) AS duration_mins, CAST(rounds AS INTEGER) AS rounds FROM workouts \
              WHERE user_id = ? AND workout_type = ? \
              AND id IN (SELECT id FROM workouts WHERE user_id = ? AND workout_type = ? \
                         ORDER BY RANDOM() LIMIT 3)",
