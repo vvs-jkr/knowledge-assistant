@@ -59,7 +59,7 @@ async fn list_workouts(
     State(state): State<AppState>,
     Query(params): Query<WorkoutsQuery>,
 ) -> ApiResult<Json<Vec<WorkoutSummary>>> {
-    let limit = params.limit.unwrap_or(50).min(200);
+    let limit = params.limit.unwrap_or(50).min(1000);
     let offset = params.offset.unwrap_or(0);
 
     let rows = sqlx::query(
@@ -716,7 +716,7 @@ async fn list_logs(
     State(state): State<AppState>,
     Query(params): Query<LogsQuery>,
 ) -> ApiResult<Json<Vec<WorkoutLog>>> {
-    let limit = params.limit.unwrap_or(50).min(200);
+    let limit = params.limit.unwrap_or(50).min(1000);
 
     let rows = sqlx::query(
         r"SELECT l.id, l.workout_id, w.name AS workout_name,

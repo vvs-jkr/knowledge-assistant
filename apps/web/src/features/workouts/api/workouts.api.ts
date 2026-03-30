@@ -132,6 +132,9 @@ const workoutsApi = {
       return workoutSummarySchema.parse(r.data)
     }),
 
+  delete: (id: string): Promise<void> =>
+    api.delete(`/workouts/${id}`).then(() => undefined),
+
   createLog: (body: CreateWorkoutLog): Promise<WorkoutLog> =>
     api.post<WorkoutLog>('/workouts/logs', body).then((r) => {
       return workoutLogSchema.parse(r.data)
@@ -235,6 +238,18 @@ export function useUpdateWorkout() {
     onSuccess: (updated) => {
       qc.invalidateQueries({ queryKey: ['workouts', 'list'] })
       qc.setQueryData(['workouts', 'detail', updated.id], updated)
+    },
+  })
+}
+
+export function useDeleteWorkout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => workoutsApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workouts', 'list'] })
+      qc.invalidateQueries({ queryKey: ['workouts', 'plans'] })
+      qc.invalidateQueries({ queryKey: ['workouts', 'stats'] })
     },
   })
 }

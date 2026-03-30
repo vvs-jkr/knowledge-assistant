@@ -15,6 +15,7 @@ export function WorkoutCardGrid() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const queryParams = {
+    limit: 1000,
     ...(filters.workout_type !== null ? { workout_type: filters.workout_type } : {}),
     ...(filters.from !== null ? { from: filters.from } : {}),
     ...(filters.to !== null ? { to: filters.to } : {}),

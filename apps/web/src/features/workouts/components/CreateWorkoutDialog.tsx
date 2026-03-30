@@ -177,10 +177,10 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
               </label>
               <input
                 id="wk-duration"
-                type="number"
-                min="0"
+                type="text"
+                inputMode="numeric"
                 value={duration}
-                onChange={(e) => setDuration(e.target.value)}
+                onChange={(e) => setDuration(e.target.value.replace(/[^\d]/g, ''))}
                 placeholder="--"
                 className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               />
@@ -191,10 +191,10 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
               </label>
               <input
                 id="wk-rounds"
-                type="number"
-                min="0"
+                type="text"
+                inputMode="numeric"
                 value={rounds}
-                onChange={(e) => setRounds(e.target.value)}
+                onChange={(e) => setRounds(e.target.value.replace(/[^\d]/g, ''))}
                 placeholder="--"
                 className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               />
@@ -260,29 +260,28 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
                     className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
                   />
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
                     value={ex.sets}
-                    onChange={(e) => updateExercise(i, 'sets', e.target.value)}
+                    onChange={(e) => updateExercise(i, 'sets', e.target.value.replace(/[^\d]/g, ''))}
                     placeholder="п."
                     title="Подходы"
                     className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
                   />
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
                     value={ex.reps}
-                    onChange={(e) => updateExercise(i, 'reps', e.target.value)}
+                    onChange={(e) => updateExercise(i, 'reps', e.target.value.replace(/[^\d]/g, ''))}
                     placeholder="р."
                     title="Повторения"
                     className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
                   />
                   <input
-                    type="number"
-                    min="0"
-                    step="0.5"
+                    type="text"
+                    inputMode="decimal"
                     value={ex.weight_kg}
-                    onChange={(e) => updateExercise(i, 'weight_kg', e.target.value)}
+                    onChange={(e) => updateExercise(i, 'weight_kg', e.target.value.replace(/[^\d.]/g, ''))}
                     placeholder="кг"
                     title="Вес (кг)"
                     className="rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"

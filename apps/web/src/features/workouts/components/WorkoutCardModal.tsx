@@ -2,15 +2,16 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useUpdateWorkout, useWorkout } from '@/features/workouts/api/workouts.api'
+import { useDeleteWorkout, useUpdateWorkout, useWorkout } from '@/features/workouts/api/workouts.api'
 import {
   WORKOUT_TYPE_BADGE_COLORS,
   WORKOUT_TYPE_LABELS,
   normalizeWorkoutName,
 } from '@/features/workouts/utils/workout-display'
 import type { WorkoutExercise, WorkoutType } from '@/shared/schemas/workouts.schema'
-import { Pencil, X } from 'lucide-react'
+import { Pencil, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 const WORKOUT_TYPES: WorkoutType[] = [
   'for_time',
@@ -116,7 +117,9 @@ interface WorkoutCardModalProps {
 export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) {
   const { data: workout, isLoading } = useWorkout(workoutId ?? '')
   const updateWorkout = useUpdateWorkout()
+  const deleteWorkout = useDeleteWorkout()
   const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
   const [workoutType, setWorkoutType] = useState<WorkoutType>('other')
@@ -136,8 +139,22 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
   }, [workout])
 
   useEffect(() => {
-    if (!workoutId) setEditing(false)
+    if (!workoutId) {
+      setEditing(false)
+      setConfirmDelete(false)
+    }
   }, [workoutId])
+
+  const handleDelete = () => {
+    if (!workout) return
+    deleteWorkout.mutate(workout.id, {
+      onSuccess: () => {
+        toast.success('Тренировка удалена')
+        onClose()
+      },
+      onError: () => toast.error('Ошибка удаления'),
+    })
+  }
 
   const handleSave = () => {
     if (!workout) return
@@ -204,14 +221,46 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                   <DialogTitle className="text-xl leading-tight">{normalizeWorkoutName(workout.name)}</DialogTitle>
                 )}
                 {!editing && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    onClick={() => setEditing(true)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setEditing(true)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    {confirmDelete ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={handleDelete}
+                          disabled={deleteWorkout.isPending}
+                        >
+                          Удалить
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setConfirmDelete(false)}
+                        >
+                          Нет
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => setConfirmDelete(true)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             </DialogHeader>
@@ -237,16 +286,18 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                     ))}
                   </select>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={durationMins}
-                    onChange={(e) => setDurationMins(e.target.value)}
+                    onChange={(e) => setDurationMins(e.target.value.replace(/[^\d]/g, ''))}
                     placeholder="мин"
                     className="w-20"
                   />
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={rounds}
-                    onChange={(e) => setRounds(e.target.value)}
+                    onChange={(e) => setRounds(e.target.value.replace(/[^\d]/g, ''))}
                     placeholder="раунды"
                     className="w-24"
                   />
