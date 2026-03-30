@@ -21,7 +21,7 @@ export function WorkoutsMainPanel() {
       {/* Tab bar */}
       <div className="flex shrink-0 items-center justify-between border-b pr-4">
         <div className="flex">
-          {(['list', 'cards', 'stats', 'plans'] as const).map((tab) => (
+          {(['cards', 'plans', 'stats', 'list'] as const).map((tab) => (
             <button
               key={tab}
               type="button"

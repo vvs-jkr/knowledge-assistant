@@ -27,7 +27,7 @@ const defaultFilters: WorkoutsFilters = {
 
 export const useWorkoutsStore = create<WorkoutsState>((set) => ({
   selectedWorkoutId: null,
-  activeTab: 'list',
+  activeTab: 'cards',
   selectedPlanId: null,
   filters: { ...defaultFilters },
   selectWorkout: (id) => set({ selectedWorkoutId: id }),

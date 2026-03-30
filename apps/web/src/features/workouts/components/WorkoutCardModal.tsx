@@ -39,7 +39,11 @@ const WORKOUT_TYPES: WorkoutType[] = [
   'other',
 ]
 
+let draftCounter = 0
+const newDraftId = () => `draft-${++draftCounter}`
+
 interface ExerciseDraft {
+  draftId: string
   exercise_id: string
   name: string
   reps: string
@@ -52,6 +56,7 @@ interface ExerciseDraft {
 
 function toExerciseDraft(ex: WorkoutExercise): ExerciseDraft {
   return {
+    draftId: newDraftId(),
     exercise_id: ex.exercise_id,
     name: ex.exercise_name,
     reps: ex.reps !== null ? String(ex.reps) : '',
@@ -187,8 +192,8 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
     const { active, over } = event
     if (!over || active.id === over.id) return
     setExerciseDrafts((prev) => {
-      const oldIndex = prev.findIndex((_, i) => (prev[i].exercise_id || `new-${i}`) === active.id)
-      const newIndex = prev.findIndex((_, i) => (prev[i].exercise_id || `new-${i}`) === over.id)
+      const oldIndex = prev.findIndex((d) => d.draftId === active.id)
+      const newIndex = prev.findIndex((d) => d.draftId === over.id)
       if (oldIndex === -1 || newIndex === -1) return prev
       const next = [...prev]
       const [moved] = next.splice(oldIndex, 1)
@@ -405,14 +410,14 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
               {editing ? (
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext
-                    items={exerciseDrafts.map((d, i) => d.exercise_id || `new-${i}`)}
+                    items={exerciseDrafts.map((d) => d.draftId)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="space-y-1">
                       {exerciseDrafts.map((d, i) => (
                         <ExerciseEditRow
-                          key={d.exercise_id || `new-${i}`}
-                          id={d.exercise_id || `new-${i}`}
+                          key={d.draftId}
+                          id={d.draftId}
                           draft={d}
                           onChange={(updated) =>
                             setExerciseDrafts((prev) => prev.map((x, j) => (j === i ? updated : x)))
@@ -432,7 +437,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                     onClick={() =>
                       setExerciseDrafts((prev) => [
                         ...prev,
-                        { exercise_id: '', name: '', sets: '', reps: '', weight_kg: '', weight_note: '', duration_secs: '', order_index: prev.length },
+                        { draftId: newDraftId(), exercise_id: '', name: '', sets: '', reps: '', weight_kg: '', weight_note: '', duration_secs: '', order_index: prev.length },
                       ])
                     }
                     className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
