@@ -150,6 +150,13 @@ function ExerciseEditRow({
         <NumField label="повт." value={draft.reps} onChange={(v) => onChange({ ...draft, reps: v })} />
         <NumField label="кг" value={draft.weight_kg} onChange={(v) => onChange({ ...draft, weight_kg: v })} />
       </div>
+      <input
+        type="text"
+        value={draft.weight_note}
+        onChange={(e) => onChange({ ...draft, weight_note: e.target.value })}
+        placeholder="заметка / время"
+        className="w-28 shrink-0 rounded border border-input bg-background px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
+      />
       <button
         type="button"
         onClick={onRemove}
@@ -277,7 +284,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
         if (!open) onClose()
       }}
     >
-      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-x-hidden overflow-y-auto">
         {isLoading || !workout ? (
           <div className="space-y-3 p-2">
             <Skeleton className="h-7 w-2/3" />
@@ -362,22 +369,28 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                       </option>
                     ))}
                   </select>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    value={durationMins}
-                    onChange={(e) => setDurationMins(e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="мин"
-                    className="w-20"
-                  />
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    value={rounds}
-                    onChange={(e) => setRounds(e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="раунды"
-                    className="w-24"
-                  />
+                  <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                    мин
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={durationMins}
+                      onChange={(e) => setDurationMins(e.target.value.replace(/[^\d]/g, ''))}
+                      placeholder="--"
+                      className="w-16"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                    раундов
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={rounds}
+                      onChange={(e) => setRounds(e.target.value.replace(/[^\d]/g, ''))}
+                      placeholder="--"
+                      className="w-16"
+                    />
+                  </label>
                 </>
               ) : (
                 <>
