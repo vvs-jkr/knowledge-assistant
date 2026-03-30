@@ -9,10 +9,12 @@ interface WorkoutsFilters {
 
 interface WorkoutsState {
   selectedWorkoutId: string | null
-  activeTab: 'list' | 'cards' | 'stats'
+  activeTab: 'list' | 'cards' | 'stats' | 'plans'
+  selectedPlanId: string | null
   filters: WorkoutsFilters
   selectWorkout: (id: string | null) => void
-  setActiveTab: (tab: 'list' | 'cards' | 'stats') => void
+  setActiveTab: (tab: 'list' | 'cards' | 'stats' | 'plans') => void
+  selectPlan: (id: string | null) => void
   setFilter: (key: keyof WorkoutsFilters, value: string | null) => void
   resetFilters: () => void
 }
@@ -26,9 +28,11 @@ const defaultFilters: WorkoutsFilters = {
 export const useWorkoutsStore = create<WorkoutsState>((set) => ({
   selectedWorkoutId: null,
   activeTab: 'list',
+  selectedPlanId: null,
   filters: { ...defaultFilters },
   selectWorkout: (id) => set({ selectedWorkoutId: id }),
   setActiveTab: (tab) => set({ activeTab: tab }),
+  selectPlan: (id) => set({ selectedPlanId: id }),
   setFilter: (key, value) =>
     set((state) => ({
       filters: {

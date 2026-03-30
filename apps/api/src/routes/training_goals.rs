@@ -31,13 +31,11 @@ async fn get_training_goals(
     AuthUser(claims): AuthUser,
     State(state): State<AppState>,
 ) -> ApiResult<Json<TrainingGoals>> {
-    let row = sqlx::query(
-        "SELECT goals, active, updated_at FROM training_goals WHERE user_id = ?",
-    )
-    .bind(&claims.sub)
-    .fetch_optional(&state.db)
-    .await
-    .map_err(AppError::from)?;
+    let row = sqlx::query("SELECT goals, active, updated_at FROM training_goals WHERE user_id = ?")
+        .bind(&claims.sub)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::from)?;
 
     let result = match row {
         Some(r) => {
@@ -75,13 +73,11 @@ async fn update_training_goals(
     State(state): State<AppState>,
     Json(body): Json<UpdateTrainingGoalsRequest>,
 ) -> ApiResult<Json<TrainingGoals>> {
-    let existing = sqlx::query(
-        "SELECT goals, active FROM training_goals WHERE user_id = ?",
-    )
-    .bind(&claims.sub)
-    .fetch_optional(&state.db)
-    .await
-    .map_err(AppError::from)?;
+    let existing = sqlx::query("SELECT goals, active FROM training_goals WHERE user_id = ?")
+        .bind(&claims.sub)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::from)?;
 
     let (current_goals, current_active): (String, bool) = match existing {
         Some(r) => {

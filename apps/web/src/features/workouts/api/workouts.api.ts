@@ -5,6 +5,8 @@ import type {
   WorkoutAnalysis,
   WorkoutDetail,
   WorkoutLog,
+  WorkoutPlanDetail,
+  WorkoutPlanSummary,
   WorkoutStats,
   WorkoutSummary,
   WorkoutType,
@@ -14,6 +16,8 @@ import {
   workoutAnalysisSchema,
   workoutDetailSchema,
   workoutLogSchema,
+  workoutPlanDetailSchema,
+  workoutPlanSummarySchema,
   workoutStatsSchema,
   workoutSummarySchema,
 } from '@/shared/schemas/workouts.schema'
@@ -61,7 +65,18 @@ type CreateWorkoutInput = {
   source_file?: string
   raw_text?: string
   year_confidence?: number
+  plan_id?: string
   exercises?: ExerciseInput[]
+}
+
+type CreatePlanInput = {
+  name: string
+  description?: string
+}
+
+type UpdatePlanInput = {
+  name?: string
+  description?: string
 }
 
 type WorkoutsQuery = Partial<
@@ -69,6 +84,7 @@ type WorkoutsQuery = Partial<
     from: string
     to: string
     exercise_id: string
+    plan_id: string
     limit: number
     offset: number
   }
@@ -133,6 +149,31 @@ const workoutsApi = {
     api.post<WorkoutAnalysis>('/workouts/analyze').then((r) => {
       return workoutAnalysisSchema.parse(r.data)
     }),
+
+  plans: {
+    list: (): Promise<WorkoutPlanSummary[]> =>
+      api.get<WorkoutPlanSummary[]>('/workouts/plans').then((r) =>
+        workoutPlanSummarySchema.array().parse(r.data),
+      ),
+
+    get: (id: string): Promise<WorkoutPlanDetail> =>
+      api
+        .get<WorkoutPlanDetail>(`/workouts/plans/${id}`)
+        .then((r) => workoutPlanDetailSchema.parse(r.data)),
+
+    create: (body: CreatePlanInput): Promise<WorkoutPlanSummary> =>
+      api
+        .post<WorkoutPlanSummary>('/workouts/plans', body)
+        .then((r) => workoutPlanSummarySchema.parse(r.data)),
+
+    update: (id: string, body: UpdatePlanInput): Promise<WorkoutPlanSummary> =>
+      api
+        .put<WorkoutPlanSummary>(`/workouts/plans/${id}`, body)
+        .then((r) => workoutPlanSummarySchema.parse(r.data)),
+
+    delete: (id: string): Promise<void> =>
+      api.delete(`/workouts/plans/${id}`).then(() => undefined),
+  },
 }
 
 export function useWorkouts(params?: WorkoutsQuery) {
@@ -208,5 +249,64 @@ export function useAnalyzeWorkouts() {
   })
 }
 
+export function useCreateWorkout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CreateWorkoutInput) => workoutsApi.create(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workouts', 'list'] })
+      qc.invalidateQueries({ queryKey: ['workouts', 'plans'] })
+    },
+  })
+}
+
+export function usePlans() {
+  return useQuery({
+    queryKey: ['workouts', 'plans'],
+    queryFn: () => workoutsApi.plans.list(),
+    staleTime: 30_000,
+  })
+}
+
+export function usePlan(id: string | null) {
+  return useQuery({
+    queryKey: ['workouts', 'plans', id],
+    queryFn: () => workoutsApi.plans.get(id as string),
+    enabled: id !== null,
+    staleTime: 30_000,
+  })
+}
+
+export function useCreatePlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CreatePlanInput) => workoutsApi.plans.create(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workouts', 'plans'] })
+    },
+  })
+}
+
+export function useUpdatePlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & UpdatePlanInput) =>
+      workoutsApi.plans.update(id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workouts', 'plans'] })
+    },
+  })
+}
+
+export function useDeletePlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => workoutsApi.plans.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workouts', 'plans'] })
+    },
+  })
+}
+
 export { workoutsApi }
-export type { WorkoutsQuery, WorkoutType, WorkoutAnalysis }
+export type { CreateWorkoutInput, WorkoutsQuery, WorkoutType, WorkoutAnalysis }

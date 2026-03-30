@@ -385,13 +385,11 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
     let mut parts: Vec<String> = Vec::new();
 
     // Training goals -- prepended so the AI treats them as highest-priority context.
-    let goals_row = sqlx::query(
-        "SELECT goals, active FROM training_goals WHERE user_id = ?",
-    )
-    .bind(user_id)
-    .fetch_optional(&state.db)
-    .await
-    .map_err(AppError::from)?;
+    let goals_row = sqlx::query("SELECT goals, active FROM training_goals WHERE user_id = ?")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::from)?;
 
     if let Some(row) = goals_row {
         let active_int: i64 = row.try_get("active").map_err(AppError::from)?;
@@ -404,13 +402,11 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
     }
 
     // Cached workout analysis summary.
-    let cache_row = sqlx::query(
-        "SELECT analysis FROM workout_analysis_cache WHERE user_id = ?",
-    )
-    .bind(user_id)
-    .fetch_optional(&state.db)
-    .await
-    .map_err(AppError::from)?;
+    let cache_row = sqlx::query("SELECT analysis FROM workout_analysis_cache WHERE user_id = ?")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(AppError::from)?;
 
     if let Some(row) = cache_row {
         let analysis_json: String = row.try_get("analysis").map_err(AppError::from)?;
@@ -461,8 +457,7 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
                             .map_err(AppError::from)?;
 
                             if let Some(r) = row {
-                                let name: String =
-                                    r.try_get("name").map_err(AppError::from)?;
+                                let name: String = r.try_get("name").map_err(AppError::from)?;
                                 let wtype: Option<String> =
                                     r.try_get("workout_type").map_err(AppError::from)?;
                                 let duration: Option<f64> =

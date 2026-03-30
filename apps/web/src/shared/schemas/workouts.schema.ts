@@ -23,6 +23,7 @@ export const workoutSummarySchema = z.object({
   rounds: z.number().nullable(),
   exercise_count: z.number(),
   source_type: sourceTypeSchema,
+  plan_id: z.string().nullable(),
   created_at: z.string(),
 })
 
@@ -47,6 +48,21 @@ export const workoutDetailSchema = workoutSummarySchema.omit({ exercise_count: t
   year_confidence: z.number().nullable(),
   updated_at: z.string(),
 })
+
+export const workoutPlanSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  workout_count: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
+export const workoutPlanDetailSchema = workoutPlanSummarySchema
+  .omit({ workout_count: true })
+  .extend({
+    workouts: z.array(workoutSummarySchema),
+  })
 
 export const exerciseInfoSchema = z.object({
   id: z.string(),
@@ -128,3 +144,5 @@ export type TypeDistEntry = z.infer<typeof typeDistEntrySchema>
 export type ExerciseProgressEntry = z.infer<typeof exerciseProgressEntrySchema>
 export type WorkoutStats = z.infer<typeof workoutStatsSchema>
 export type CreateWorkoutLog = z.infer<typeof createWorkoutLogSchema>
+export type WorkoutPlanSummary = z.infer<typeof workoutPlanSummarySchema>
+export type WorkoutPlanDetail = z.infer<typeof workoutPlanDetailSchema>

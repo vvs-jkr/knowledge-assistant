@@ -23,7 +23,30 @@ pub struct WorkoutSummary {
     pub rounds: Option<i64>,
     pub exercise_count: i64,
     pub source_type: String,
+    pub plan_id: Option<String>,
     pub created_at: String,
+}
+
+/// Summary of a workout plan returned by the list endpoint.
+#[derive(Debug, Serialize)]
+pub struct WorkoutPlanSummary {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub workout_count: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Full workout plan detail including its workouts.
+#[derive(Debug, Serialize)]
+pub struct WorkoutPlanDetail {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub workouts: Vec<WorkoutSummary>,
 }
 
 /// A single exercise entry within a workout, including catalogue metadata.
@@ -55,6 +78,7 @@ pub struct WorkoutDetail {
     pub source_file: Option<String>,
     pub raw_text: Option<String>,
     pub year_confidence: Option<f64>,
+    pub plan_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     pub exercises: Vec<WorkoutExercise>,
@@ -163,6 +187,20 @@ pub struct ExerciseInput {
     pub notes: Option<String>,
 }
 
+/// Request body for `POST /workouts/plans`.
+#[derive(Debug, Deserialize)]
+pub struct CreatePlanRequest {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+/// Request body for `PUT /workouts/plans/:id`.
+#[derive(Debug, Deserialize)]
+pub struct UpdatePlanRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+}
+
 /// Request body for `POST /workouts`.
 #[derive(Debug, Deserialize)]
 pub struct CreateWorkoutRequest {
@@ -176,6 +214,7 @@ pub struct CreateWorkoutRequest {
     pub source_file: Option<String>,
     pub raw_text: Option<String>,
     pub year_confidence: Option<f64>,
+    pub plan_id: Option<String>,
     pub exercises: Option<Vec<ExerciseInput>>,
 }
 
@@ -217,6 +256,7 @@ pub struct WorkoutsQuery {
     pub from: Option<String>,
     pub to: Option<String>,
     pub exercise_id: Option<String>,
+    pub plan_id: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }

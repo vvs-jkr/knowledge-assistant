@@ -22,9 +22,11 @@ function setupStore() {
     const state = {
       selectedWorkoutId: null,
       activeTab: 'list' as const,
+      selectedPlanId: null,
       filters: mockFilters,
       selectWorkout: mockSelectWorkout,
       setActiveTab: vi.fn(),
+      selectPlan: vi.fn(),
       setFilter: vi.fn(),
       resetFilters: vi.fn(),
     }

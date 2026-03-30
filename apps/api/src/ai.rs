@@ -536,7 +536,9 @@ fn build_workout_analysis_message(stats: &str, workouts: &str, health: &str) -> 
         Do NOT interpret the total session count as daily solo training volume. \
         The gym does NOT have gymnastic rings or climbing rope -- do not recommend exercises \
         requiring this equipment.\n\n";
-    let mut msg = format!("{context_note}## Workout Statistics\n{stats}\n\n## Full Workout History\n{workouts}");
+    let mut msg = format!(
+        "{context_note}## Workout Statistics\n{stats}\n\n## Full Workout History\n{workouts}"
+    );
     if !health.is_empty() {
         let _ = write!(msg, "\n\n## Body Composition (InBody / Lab)\n{health}");
     }

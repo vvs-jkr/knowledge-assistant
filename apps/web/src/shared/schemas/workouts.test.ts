@@ -16,6 +16,7 @@ const baseSummary = {
   rounds: null,
   exercise_count: 5,
   source_type: 'manual' as const,
+  plan_id: null,
   created_at: '2026-01-15T08:00:00Z',
 }
 

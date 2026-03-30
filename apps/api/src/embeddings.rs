@@ -209,14 +209,12 @@ pub async fn upsert_workout_embedding(
     embedding: &[f32],
 ) -> ApiResult<()> {
     let bytes = embedding_to_bytes(embedding);
-    sqlx::query(
-        "INSERT OR REPLACE INTO workout_embeddings(workout_id, embedding) VALUES (?, ?)",
-    )
-    .bind(workout_id)
-    .bind(&bytes)
-    .execute(db)
-    .await
-    .map_err(|e| AppError::Internal(anyhow::anyhow!("workout embedding upsert: {e}")))?;
+    sqlx::query("INSERT OR REPLACE INTO workout_embeddings(workout_id, embedding) VALUES (?, ?)")
+        .bind(workout_id)
+        .bind(&bytes)
+        .execute(db)
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("workout embedding upsert: {e}")))?;
     Ok(())
 }
 
@@ -373,11 +371,11 @@ mod tests {
     #[test]
     fn average_embeddings_correct() {
         let items = vec![
-            VoyageEmbeddingItem {
+            EmbeddingItem {
                 embedding: vec![1.0, 2.0],
                 index: 0,
             },
-            VoyageEmbeddingItem {
+            EmbeddingItem {
                 embedding: vec![3.0, 4.0],
                 index: 1,
             },

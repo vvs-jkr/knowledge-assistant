@@ -15,11 +15,12 @@ use crate::{
     error::{ApiResult, AppError},
     middleware::AuthUser,
     workouts::{
-        validate_date, validate_workout_type, CreateLogRequest, CreateWorkoutRequest, EmbedAllResponse,
-        ExerciseInfo, ExerciseInput, ExerciseProgress, ExercisesQuery, GenerateWorkoutRequest,
-        GeneratedWorkoutResponse, HeatmapEntry, LogsQuery, StatsQuery, TypeDistribution,
-        UpdateWorkoutRequest, VolumeEntry, WorkoutAnalysis, WorkoutDetail, WorkoutExercise,
-        WorkoutLog, WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
+        validate_date, validate_workout_type, CreateLogRequest, CreatePlanRequest,
+        CreateWorkoutRequest, EmbedAllResponse, ExerciseInfo, ExerciseInput, ExerciseProgress,
+        ExercisesQuery, GenerateWorkoutRequest, GeneratedWorkoutResponse, HeatmapEntry, LogsQuery,
+        StatsQuery, TypeDistribution, UpdatePlanRequest, UpdateWorkoutRequest, VolumeEntry,
+        WorkoutAnalysis, WorkoutDetail, WorkoutExercise, WorkoutLog, WorkoutPlanDetail,
+        WorkoutPlanSummary, WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
     },
 };
 
@@ -31,10 +32,18 @@ pub fn router() -> Router<AppState> {
             "/workouts/analyze",
             axum::routing::post(analyze_workouts_handler),
         )
-        .route("/workouts/embed-all", axum::routing::post(embed_all_workouts))
+        .route(
+            "/workouts/embed-all",
+            axum::routing::post(embed_all_workouts),
+        )
         .route("/workouts/stats", get(get_stats))
         .route("/workouts/exercises", get(list_exercises))
         .route("/workouts/logs", get(list_logs).post(create_log))
+        .route("/workouts/plans", get(list_plans).post(create_plan))
+        .route(
+            "/workouts/plans/:id",
+            get(get_plan).put(update_plan).delete(delete_plan),
+        )
         .route(
             "/workouts/:id",
             get(get_workout).put(update_workout).delete(delete_workout),
@@ -55,7 +64,7 @@ async fn list_workouts(
 
     let rows = sqlx::query(
         r"SELECT w.id, w.date, w.name, w.workout_type, w.duration_mins, w.rounds,
-                 w.source_type, w.created_at,
+                 w.source_type, w.plan_id, w.created_at,
                  COUNT(we.id) AS exercise_count
           FROM workouts w
           LEFT JOIN workout_exercises we ON we.workout_id = w.id
@@ -67,6 +76,7 @@ async fn list_workouts(
                 SELECT 1 FROM workout_exercises we2
                 WHERE we2.workout_id = w.id AND we2.exercise_id = ?
             ))
+            AND (? IS NULL OR w.plan_id = ?)
           GROUP BY w.id
           ORDER BY w.date DESC, w.created_at DESC
           LIMIT ? OFFSET ?",
@@ -80,6 +90,8 @@ async fn list_workouts(
     .bind(params.to.as_deref())
     .bind(params.exercise_id.as_deref())
     .bind(params.exercise_id.as_deref())
+    .bind(params.plan_id.as_deref())
+    .bind(params.plan_id.as_deref())
     .bind(limit)
     .bind(offset)
     .fetch_all(&state.db)
@@ -98,6 +110,7 @@ async fn list_workouts(
                 rounds: r.try_get("rounds").map_err(AppError::from)?,
                 exercise_count: r.try_get("exercise_count").map_err(AppError::from)?,
                 source_type: r.try_get("source_type").map_err(AppError::from)?,
+                plan_id: r.try_get("plan_id").map_err(AppError::from)?,
                 created_at: r.try_get("created_at").map_err(AppError::from)?,
             })
         })
@@ -132,6 +145,19 @@ async fn create_workout(
         )));
     }
 
+    // Verify plan ownership if plan_id is provided.
+    if let Some(ref pid) = body.plan_id {
+        let exists = sqlx::query("SELECT id FROM workout_plans WHERE id = ? AND user_id = ?")
+            .bind(pid)
+            .bind(&claims.sub)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(AppError::from)?;
+        if exists.is_none() {
+            return Err(AppError::NotFound);
+        }
+    }
+
     let workout_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
@@ -140,8 +166,8 @@ async fn create_workout(
     sqlx::query(
         r"INSERT INTO workouts
           (id, user_id, date, name, workout_type, duration_mins, rounds,
-           source_type, source_file, raw_text, year_confidence, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+           source_type, source_file, raw_text, year_confidence, plan_id, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&workout_id)
     .bind(&claims.sub)
@@ -154,6 +180,7 @@ async fn create_workout(
     .bind(body.source_file.as_deref())
     .bind(body.raw_text.as_deref())
     .bind(body.year_confidence)
+    .bind(body.plan_id.as_deref())
     .bind(&now)
     .bind(&now)
     .execute(&mut *tx)
@@ -330,14 +357,13 @@ async fn embed_all_workouts(
     }
 
     // Find workout IDs that already have embeddings.
-    let embedded_ids: std::collections::HashSet<String> = sqlx::query_scalar(
-        "SELECT workout_id FROM workout_embeddings",
-    )
-    .fetch_all(&state.db)
-    .await
-    .map_err(AppError::from)?
-    .into_iter()
-    .collect();
+    let embedded_ids: std::collections::HashSet<String> =
+        sqlx::query_scalar("SELECT workout_id FROM workout_embeddings")
+            .fetch_all(&state.db)
+            .await
+            .map_err(AppError::from)?
+            .into_iter()
+            .collect();
 
     // Fetch all workouts with their exercises in one query.
     // CAST normalises mixed INTEGER/REAL storage from the digitizer.
@@ -373,7 +399,13 @@ async fn embed_all_workouts(
         let duration_mins: Option<f64> = row.try_get("duration_mins").map_err(AppError::from)?;
         let rounds: Option<i64> = row.try_get("rounds").map_err(AppError::from)?;
         let exercises: Option<String> = row.try_get("exercise_names").map_err(AppError::from)?;
-        let text = build_workout_text(&name, workout_type.as_deref(), duration_mins, rounds, exercises.as_deref());
+        let text = build_workout_text(
+            &name,
+            workout_type.as_deref(),
+            duration_mins,
+            rounds,
+            exercises.as_deref(),
+        );
         to_embed.push((id, text));
     }
 
@@ -795,14 +827,23 @@ fn spawn_workout_embedding(state: &AppState, workout_id: String) {
 
         let name: String = match row.try_get("name") {
             Ok(v) => v,
-            Err(e) => { tracing::warn!("spawn_workout_embedding name: {e}"); return; }
+            Err(e) => {
+                tracing::warn!("spawn_workout_embedding name: {e}");
+                return;
+            }
         };
         let workout_type: Option<String> = row.try_get("workout_type").ok().flatten();
         let duration_mins: Option<f64> = row.try_get("duration_mins").ok().flatten();
         let rounds: Option<i64> = row.try_get("rounds").ok().flatten();
         let exercises: Option<String> = row.try_get("exercise_names").ok().flatten();
 
-        let text = build_workout_text(&name, workout_type.as_deref(), duration_mins, rounds, exercises.as_deref());
+        let text = build_workout_text(
+            &name,
+            workout_type.as_deref(),
+            duration_mins,
+            rounds,
+            exercises.as_deref(),
+        );
 
         match embeddings::generate_embedding(&http, &key, &text, "document").await {
             Ok(emb) => {
@@ -831,7 +872,7 @@ async fn fetch_workout_detail(
 ) -> ApiResult<WorkoutDetail> {
     let row = sqlx::query(
         r"SELECT id, date, name, workout_type, duration_mins, rounds,
-                 source_type, source_file, raw_text, year_confidence, created_at, updated_at
+                 source_type, source_file, raw_text, year_confidence, plan_id, created_at, updated_at
           FROM workouts
           WHERE id = ? AND user_id = ?",
     )
@@ -889,10 +930,54 @@ async fn fetch_workout_detail(
         source_file: row.try_get("source_file").map_err(AppError::from)?,
         raw_text: row.try_get("raw_text").map_err(AppError::from)?,
         year_confidence: row.try_get("year_confidence").map_err(AppError::from)?,
+        plan_id: row.try_get("plan_id").map_err(AppError::from)?,
         created_at: row.try_get("created_at").map_err(AppError::from)?,
         updated_at: row.try_get("updated_at").map_err(AppError::from)?,
         exercises,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Helper: fetch workouts for a plan
+// ---------------------------------------------------------------------------
+
+async fn fetch_plan_workouts(
+    state: &AppState,
+    plan_id: &str,
+    user_id: &str,
+) -> ApiResult<Vec<WorkoutSummary>> {
+    let rows = sqlx::query(
+        r"SELECT w.id, w.date, w.name, w.workout_type, w.duration_mins, w.rounds,
+                 w.source_type, w.plan_id, w.created_at,
+                 COUNT(we.id) AS exercise_count
+          FROM workouts w
+          LEFT JOIN workout_exercises we ON we.workout_id = w.id
+          WHERE w.user_id = ? AND w.plan_id = ?
+          GROUP BY w.id
+          ORDER BY w.date DESC, w.created_at DESC",
+    )
+    .bind(user_id)
+    .bind(plan_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    rows.into_iter()
+        .map(|r| -> ApiResult<WorkoutSummary> {
+            Ok(WorkoutSummary {
+                id: r.try_get("id").map_err(AppError::from)?,
+                date: r.try_get("date").map_err(AppError::from)?,
+                name: r.try_get("name").map_err(AppError::from)?,
+                workout_type: r.try_get("workout_type").map_err(AppError::from)?,
+                duration_mins: r.try_get("duration_mins").map_err(AppError::from)?,
+                rounds: r.try_get("rounds").map_err(AppError::from)?,
+                exercise_count: r.try_get("exercise_count").map_err(AppError::from)?,
+                source_type: r.try_get("source_type").map_err(AppError::from)?,
+                plan_id: r.try_get("plan_id").map_err(AppError::from)?,
+                created_at: r.try_get("created_at").map_err(AppError::from)?,
+            })
+        })
+        .collect()
 }
 
 /// Insert exercise rows for a workout, upserting by name when needed.
@@ -1061,7 +1146,9 @@ pub async fn format_workouts_compact(
 /// Result is stored in `workout_analysis_cache.workout_examples` and injected
 /// into the chat system prompt so the AI can match style without re-querying.
 async fn build_workout_examples(db: &sqlx::SqlitePool, user_id: &str) -> ApiResult<String> {
-    let types = ["for_time", "amrap", "emom", "tabata", "lifting", "rounds", "other"];
+    let types = [
+        "for_time", "amrap", "emom", "tabata", "lifting", "rounds", "other",
+    ];
     let mut sections: Vec<String> = Vec::new();
 
     for wtype in types {
@@ -1108,7 +1195,8 @@ async fn build_workout_examples(db: &sqlx::SqlitePool, user_id: &str) -> ApiResu
                 let sets: Option<i64> = ex.try_get("sets").map_err(AppError::from)?;
                 let reps: Option<i64> = ex.try_get("reps").map_err(AppError::from)?;
                 let weight: Option<f64> = ex.try_get("weight_kg").map_err(AppError::from)?;
-                let weight_note: Option<String> = ex.try_get("weight_note").map_err(AppError::from)?;
+                let weight_note: Option<String> =
+                    ex.try_get("weight_note").map_err(AppError::from)?;
                 let dur_secs: Option<i64> = ex.try_get("duration_secs").map_err(AppError::from)?;
 
                 let detail = match (sets, reps, weight) {
@@ -1352,7 +1440,8 @@ async fn analyze_workouts_handler(
         let cached_count: i64 = row.try_get("workout_count").map_err(AppError::from)?;
         let cached_date: String = row.try_get("last_workout_date").map_err(AppError::from)?;
         let cached_examples: String = row.try_get("workout_examples").unwrap_or_default();
-        if cached_count == total_workouts && cached_date == last_date && !cached_examples.is_empty() {
+        if cached_count == total_workouts && cached_date == last_date && !cached_examples.is_empty()
+        {
             let cached_json: String = row.try_get("analysis").map_err(AppError::from)?;
             if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&cached_json) {
                 return Ok(Json(analysis));
@@ -1497,4 +1586,235 @@ fn compute_streak(dates: &[String], today: &str) -> i64 {
     }
 
     streak
+}
+
+// ---------------------------------------------------------------------------
+// GET /workouts/plans
+// ---------------------------------------------------------------------------
+
+/// List all workout plans for the authenticated user.
+///
+/// # Errors
+///
+/// Returns [`AppError`] if the database query fails.
+async fn list_plans(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+) -> ApiResult<Json<Vec<WorkoutPlanSummary>>> {
+    let rows = sqlx::query(
+        r"SELECT wp.id, wp.name, wp.description, wp.created_at, wp.updated_at,
+                 COUNT(w.id) AS workout_count
+          FROM workout_plans wp
+          LEFT JOIN workouts w ON w.plan_id = wp.id
+          WHERE wp.user_id = ?
+          GROUP BY wp.id
+          ORDER BY wp.updated_at DESC",
+    )
+    .bind(&claims.sub)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let plans = rows
+        .into_iter()
+        .map(|r| -> ApiResult<WorkoutPlanSummary> {
+            Ok(WorkoutPlanSummary {
+                id: r.try_get("id").map_err(AppError::from)?,
+                name: r.try_get("name").map_err(AppError::from)?,
+                description: r.try_get("description").map_err(AppError::from)?,
+                workout_count: r.try_get("workout_count").map_err(AppError::from)?,
+                created_at: r.try_get("created_at").map_err(AppError::from)?,
+                updated_at: r.try_get("updated_at").map_err(AppError::from)?,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    Ok(Json(plans))
+}
+
+// ---------------------------------------------------------------------------
+// POST /workouts/plans
+// ---------------------------------------------------------------------------
+
+/// Create a new workout plan.
+///
+/// # Errors
+///
+/// Returns [`AppError::BadRequest`] if name is empty.
+async fn create_plan(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<CreatePlanRequest>,
+) -> ApiResult<(StatusCode, Json<WorkoutPlanSummary>)> {
+    if body.name.trim().is_empty() {
+        return Err(AppError::BadRequest("name is required".into()));
+    }
+
+    let plan_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let description = body.description.unwrap_or_default();
+
+    sqlx::query(
+        "INSERT INTO workout_plans (id, user_id, name, description, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&plan_id)
+    .bind(&claims.sub)
+    .bind(body.name.trim())
+    .bind(&description)
+    .bind(&now)
+    .bind(&now)
+    .execute(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(WorkoutPlanSummary {
+            id: plan_id,
+            name: body.name.trim().to_owned(),
+            description,
+            workout_count: 0,
+            created_at: now.clone(),
+            updated_at: now,
+        }),
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// GET /workouts/plans/:id
+// ---------------------------------------------------------------------------
+
+/// Get a workout plan with all its workouts.
+///
+/// # Errors
+///
+/// Returns [`AppError::NotFound`] if the plan does not exist for this user.
+async fn get_plan(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<WorkoutPlanDetail>> {
+    let row = sqlx::query(
+        "SELECT id, name, description, created_at, updated_at
+         FROM workout_plans WHERE id = ? AND user_id = ?",
+    )
+    .bind(&id)
+    .bind(&claims.sub)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?
+    .ok_or(AppError::NotFound)?;
+
+    let workouts = fetch_plan_workouts(&state, &id, &claims.sub).await?;
+
+    Ok(Json(WorkoutPlanDetail {
+        id: row.try_get("id").map_err(AppError::from)?,
+        name: row.try_get("name").map_err(AppError::from)?,
+        description: row.try_get("description").map_err(AppError::from)?,
+        created_at: row.try_get("created_at").map_err(AppError::from)?,
+        updated_at: row.try_get("updated_at").map_err(AppError::from)?,
+        workouts,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// PUT /workouts/plans/:id
+// ---------------------------------------------------------------------------
+
+/// Update a workout plan's name and/or description.
+///
+/// # Errors
+///
+/// Returns [`AppError::NotFound`] if the plan does not exist for this user,
+/// or [`AppError::BadRequest`] if name is empty when provided.
+async fn update_plan(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<UpdatePlanRequest>,
+) -> ApiResult<Json<WorkoutPlanSummary>> {
+    // Verify ownership.
+    let row = sqlx::query(
+        "SELECT id, name, description, workout_count, created_at FROM (
+             SELECT wp.id, wp.name, wp.description, wp.created_at,
+                    COUNT(w.id) AS workout_count
+             FROM workout_plans wp
+             LEFT JOIN workouts w ON w.plan_id = wp.id
+             WHERE wp.id = ? AND wp.user_id = ?
+             GROUP BY wp.id
+         )",
+    )
+    .bind(&id)
+    .bind(&claims.sub)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?
+    .ok_or(AppError::NotFound)?;
+
+    if let Some(ref n) = body.name {
+        if n.trim().is_empty() {
+            return Err(AppError::BadRequest("name cannot be empty".into()));
+        }
+    }
+
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let new_name: String = body
+        .name
+        .as_deref()
+        .map(str::trim)
+        .map_or_else(|| row.try_get("name").unwrap_or_default(), ToOwned::to_owned);
+    let new_desc: String = body
+        .description
+        .unwrap_or_else(|| row.try_get("description").unwrap_or_default());
+
+    sqlx::query(
+        "UPDATE workout_plans SET name = ?, description = ?, updated_at = ?
+         WHERE id = ? AND user_id = ?",
+    )
+    .bind(&new_name)
+    .bind(&new_desc)
+    .bind(&now)
+    .bind(&id)
+    .bind(&claims.sub)
+    .execute(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    Ok(Json(WorkoutPlanSummary {
+        id: row.try_get("id").map_err(AppError::from)?,
+        name: new_name,
+        description: new_desc,
+        workout_count: row.try_get("workout_count").map_err(AppError::from)?,
+        created_at: row.try_get("created_at").map_err(AppError::from)?,
+        updated_at: now,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /workouts/plans/:id
+// ---------------------------------------------------------------------------
+
+/// Delete a workout plan. Workouts in the plan have their `plan_id` set to NULL.
+///
+/// # Errors
+///
+/// Returns [`AppError::NotFound`] if the plan does not exist for this user.
+async fn delete_plan(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    let result = sqlx::query("DELETE FROM workout_plans WHERE id = ? AND user_id = ?")
+        .bind(&id)
+        .bind(&claims.sub)
+        .execute(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }

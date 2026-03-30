@@ -1,53 +1,13 @@
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useWorkouts } from '@/features/workouts/api/workouts.api'
+import { WorkoutCard } from '@/features/workouts/components/WorkoutCard'
 import { WorkoutCardModal } from '@/features/workouts/components/WorkoutCardModal'
-import {
-  WORKOUT_TYPE_BADGE_COLORS,
-  WORKOUT_TYPE_BORDER_COLORS,
-  WORKOUT_TYPE_LABELS,
-  normalizeWorkoutName,
-} from '@/features/workouts/utils/workout-display'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
-import type { WorkoutSummary, WorkoutType } from '@/shared/schemas/workouts.schema'
-import { ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
 const PAGE_SIZE = 24
-
-function WorkoutCard({ workout, onClick }: { workout: WorkoutSummary; onClick: () => void }) {
-  const type = workout.workout_type as WorkoutType
-  const borderColor = WORKOUT_TYPE_BORDER_COLORS[type] ?? 'border-l-zinc-400'
-  const badgeColor = WORKOUT_TYPE_BADGE_COLORS[type] ?? 'bg-zinc-100 text-zinc-600'
-  const label = WORKOUT_TYPE_LABELS[type] ?? workout.workout_type
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex flex-col gap-2 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:shadow-md hover:border-foreground/20 border-l-4 ${borderColor}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">{workout.date}</span>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badgeColor}`}>
-          {label}
-        </span>
-      </div>
-
-      <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
-        {normalizeWorkoutName(workout.name)}
-      </p>
-
-      <div className="mt-auto flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <Dumbbell className="h-3 w-3" />
-          <span>{workout.exercise_count}</span>
-        </span>
-        {workout.duration_mins !== null && <span>{workout.duration_mins} мин</span>}
-        {workout.rounds !== null && <span>{workout.rounds} р.</span>}
-      </div>
-    </button>
-  )
-}
 
 export function WorkoutCardGrid() {
   const filters = useWorkoutsStore((s) => s.filters)
