@@ -11,7 +11,7 @@ export function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl">Knowledge Assistant</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+          <CardDescription>Войдите в свой аккаунт</CardDescription>
         </CardHeader>
         <CardContent>
           <LoginForm />

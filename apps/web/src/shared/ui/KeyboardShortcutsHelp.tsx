@@ -1,14 +1,14 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const SHORTCUTS = [
-  { key: 'g n', description: 'Go to Notes' },
-  { key: 'g h', description: 'Go to Health' },
-  { key: 'g w', description: 'Go to Workouts' },
-  { key: '[', description: 'Toggle sidebar' },
-  { key: '/', description: 'Focus search (Notes)' },
-  { key: '⌘S / Ctrl+S', description: 'Save note' },
-  { key: 'Esc', description: 'Cancel editing' },
-  { key: '?', description: 'Show this help' },
+  { key: 'g n', description: 'Перейти к заметкам' },
+  { key: 'g h', description: 'Перейти к здоровью' },
+  { key: 'g w', description: 'Перейти к тренировкам' },
+  { key: '[', description: 'Свернуть или развернуть меню' },
+  { key: '/', description: 'Фокус на поиске в заметках' },
+  { key: '⌘S / Ctrl+S', description: 'Сохранить заметку' },
+  { key: 'Esc', description: 'Отменить редактирование' },
+  { key: '?', description: 'Показать эту справку' },
 ]
 
 interface KeyboardShortcutsHelpProps {
@@ -21,7 +21,7 @@ export function KeyboardShortcutsHelp({ open, onOpenChange }: KeyboardShortcutsH
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Keyboard Shortcuts</DialogTitle>
+          <DialogTitle>Горячие клавиши</DialogTitle>
         </DialogHeader>
         <div className="space-y-0.5">
           {SHORTCUTS.map(({ key, description }) => (

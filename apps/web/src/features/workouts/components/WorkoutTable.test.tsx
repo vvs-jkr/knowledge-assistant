@@ -70,7 +70,7 @@ describe('WorkoutTable', () => {
       isLoading: false,
     } as unknown as ReturnType<typeof useWorkouts>)
     render(<WorkoutTable />)
-    expect(screen.getByText(/no workouts found/i)).toBeTruthy()
+    expect(screen.getByText(/тренировки не найдены/i)).toBeTruthy()
   })
 
   it('renders workout name and date', async () => {
@@ -91,12 +91,12 @@ describe('WorkoutTable', () => {
       isLoading: false,
     } as unknown as ReturnType<typeof useWorkouts>)
     render(<WorkoutTable />)
-    expect(screen.getByText('Date')).toBeTruthy()
-    expect(screen.getByText('Name')).toBeTruthy()
-    expect(screen.getByText('Type')).toBeTruthy()
-    expect(screen.queryByText('Duration')).toBeNull()
-    expect(screen.queryByText('Rounds')).toBeNull()
-    expect(screen.queryByText('Source')).toBeNull()
+    expect(screen.getByText('Дата')).toBeTruthy()
+    expect(screen.getByText('Название')).toBeTruthy()
+    expect(screen.getByText('Тип')).toBeTruthy()
+    expect(screen.queryByText('Длительность')).toBeNull()
+    expect(screen.queryByText('Раунды')).toBeNull()
+    expect(screen.queryByText('Источник')).toBeNull()
   })
 
   it('clicking a row calls selectWorkout with row id', async () => {

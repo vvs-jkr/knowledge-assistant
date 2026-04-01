@@ -26,10 +26,10 @@ function formatRelativeDate(dateStr: string): string {
   const diffHours = Math.floor(diffMins / 60)
   const diffDays = Math.floor(diffHours / 24)
   if (diffDays > 30) return date.toLocaleDateString()
-  if (diffDays > 0) return `${diffDays}d ago`
-  if (diffHours > 0) return `${diffHours}h ago`
-  if (diffMins > 0) return `${diffMins}m ago`
-  return 'just now'
+  if (diffDays > 0) return `${diffDays} дн. назад`
+  if (diffHours > 0) return `${diffHours} ч. назад`
+  if (diffMins > 0) return `${diffMins} мин. назад`
+  return 'только что'
 }
 
 export function NoteList() {
@@ -52,8 +52,8 @@ export function NoteList() {
   if (!notes?.length) {
     return (
       <div className="flex flex-col items-center justify-center gap-1 p-8 text-center text-sm text-muted-foreground">
-        <p>No notes yet</p>
-        <p>Upload .md files above</p>
+        <p>Заметок пока нет</p>
+        <p>Загрузите `.md`-файлы через форму выше</p>
       </div>
     )
   }
@@ -102,18 +102,18 @@ export function NoteList() {
                     }}
                   >
                     <Edit className="h-4 w-4" />
-                    Edit
+                    Редактировать
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation()
                       void downloadNote(note.id, note.filename).catch(() =>
-                        toast.error('Download failed')
+                        toast.error('Не удалось скачать заметку')
                       )
                     }}
                   >
                     <Download className="h-4 w-4" />
-                    Download
+                    Скачать
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
@@ -122,14 +122,14 @@ export function NoteList() {
                       deleteNote.mutate(note.id, {
                         onSuccess: () => {
                           if (selectedNoteId === note.id) selectNote(null)
-                          toast.success('Note deleted')
+                          toast.success('Заметка удалена')
                         },
-                        onError: () => toast.error('Failed to delete note'),
+                        onError: () => toast.error('Не удалось удалить заметку'),
                       })
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
-                    Delete
+                    Удалить
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

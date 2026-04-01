@@ -2,6 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useHealthMetrics } from '@/features/health/api/health.api'
 import type { HealthMetric, MetricsQuery } from '@/shared/schemas/health.schema'
 import { TrendingDown, TrendingUp } from 'lucide-react'
+import { Fragment } from 'react'
 
 // ---------------------------------------------------------------------------
 // Localisation
@@ -258,9 +259,9 @@ export function MetricsTable({ params }: MetricsTableProps) {
         </thead>
         <tbody>
           {groups.map((group) => (
-            <>
+            <Fragment key={group.date}>
               {/* Date header row */}
-              <tr key={`date-${group.date}`} className="border-b bg-muted/30">
+              <tr className="border-b bg-muted/30">
                 <td
                   colSpan={6}
                   className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
@@ -270,9 +271,9 @@ export function MetricsTable({ params }: MetricsTableProps) {
               </tr>
 
               {group.categories.map((cat) => (
-                <>
+                <Fragment key={`${group.date}-${cat.label}`}>
                   {/* Category sub-header */}
-                  <tr key={`cat-${group.date}-${cat.label}`} className="border-b bg-muted/10">
+                  <tr className="border-b bg-muted/10">
                     <td colSpan={6} className="px-4 py-1.5 text-xs font-medium text-foreground/60">
                       {cat.label}
                     </td>
@@ -307,9 +308,9 @@ export function MetricsTable({ params }: MetricsTableProps) {
                       </td>
                     </tr>
                   ))}
-                </>
+                </Fragment>
               ))}
-            </>
+            </Fragment>
           ))}
         </tbody>
       </table>

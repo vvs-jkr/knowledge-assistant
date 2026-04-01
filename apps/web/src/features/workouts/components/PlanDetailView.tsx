@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDeletePlan, usePlan } from '@/features/workouts/api/workouts.api'
+import { CreateWorkoutDialog } from '@/features/workouts/components/CreateWorkoutDialog'
 import { WorkoutCard } from '@/features/workouts/components/WorkoutCard'
 import { WorkoutCardModal } from '@/features/workouts/components/WorkoutCardModal'
-import { CreateWorkoutDialog } from '@/features/workouts/components/CreateWorkoutDialog'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
@@ -114,11 +114,7 @@ export function PlanDetailView({ planId }: { planId: string }) {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {plan.workouts.map((w) => (
-              <WorkoutCard
-                key={w.id}
-                workout={w}
-                onClick={() => setSelectedWorkoutId(w.id)}
-              />
+              <WorkoutCard key={w.id} workout={w} onClick={() => setSelectedWorkoutId(w.id)} />
             ))}
           </div>
         )}

@@ -10,8 +10,8 @@ export function RegisterPage() {
       </div>
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl">Create account</CardTitle>
-          <CardDescription>Knowledge Assistant — new account</CardDescription>
+          <CardTitle className="text-2xl">Создание аккаунта</CardTitle>
+          <CardDescription>Knowledge Assistant — новый аккаунт</CardDescription>
         </CardHeader>
         <CardContent>
           <RegisterForm />

@@ -4,8 +4,8 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useTrainingGoals, useUpdateTrainingGoals } from '@/features/chat/api/chat.api'
 import type { WorkoutAnalysis } from '@/features/workouts/api/workouts.api'
-import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 
 export function TrainingGoals() {
   const { data: goals, isLoading } = useTrainingGoals()

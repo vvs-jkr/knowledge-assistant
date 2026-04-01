@@ -15,7 +15,7 @@ const queryClient = new QueryClient({
 
       const msg =
         (error as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        (error instanceof Error ? error.message : 'Something went wrong')
+        (error instanceof Error ? error.message : 'Что-то пошло не так')
       toast.error(msg)
     },
   }),

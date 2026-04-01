@@ -56,6 +56,31 @@ function cellColorClass(count: number): string {
 const DAY_LABELS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
 const SHOW_DAY_LABELS = [1, 3, 5] // Mon, Wed, Fri indices
 
+function getWeekKey(col: GridCell[], index: number): string {
+  return col[0]?.date ?? `week-${index}`
+}
+
+function getCellTitle(cell: GridCell): string {
+  if (cell === null) return ''
+  const workoutsWord =
+    cell.count === 1 ? 'тренировка' : cell.count < 5 ? 'тренировки' : 'тренировок'
+  return `${cell.date}: ${cell.count} ${workoutsWord}`
+}
+
+function HeatmapWeekColumn({ col, index }: { col: GridCell[]; index: number }) {
+  return (
+    <div key={getWeekKey(col, index)} className="flex flex-col gap-0.5">
+      {col.map((cell, cellIndex) => (
+        <div
+          key={cell?.date ?? `${getWeekKey(col, index)}-${cellIndex}`}
+          className={`h-4 w-4 rounded-sm ${cell ? cellColorClass(cell.count) : 'bg-muted'}`}
+          title={getCellTitle(cell)}
+        />
+      ))}
+    </div>
+  )
+}
+
 function getMonthLabels(cols: GridCell[][]): { label: string; colIndex: number }[] {
   const labels: { label: string; colIndex: number }[] = []
   let lastMonth = -1
@@ -87,10 +112,8 @@ export function WorkoutCalendarHeatmap({ data }: WorkoutCalendarHeatmapProps) {
         <div className="flex gap-0.5 pl-8">
           {cols.map((col, i) => {
             const label = monthLabels.find((m) => m.colIndex === i)
-            // Use the week's start date as key (guaranteed unique)
-            const weekKey = col[0]?.date ?? `week-${i}`
             return (
-              <div key={weekKey} className="h-4 w-4 text-center">
+              <div key={getWeekKey(col, i)} className="h-4 w-4 text-center">
                 {label && (
                   <span className="text-[10px] text-muted-foreground leading-none">
                     {label.label}
@@ -115,24 +138,9 @@ export function WorkoutCalendarHeatmap({ data }: WorkoutCalendarHeatmapProps) {
           </div>
 
           {/* Cells */}
-          {cols.map((col) => {
-            const weekKey = col[0]?.date ?? `empty-${Math.random()}`
-            return (
-              <div key={weekKey} className="flex flex-col gap-0.5">
-                {col.map((cell) => (
-                  <div
-                    key={cell?.date ?? 'empty'}
-                    className={`h-4 w-4 rounded-sm ${cell ? cellColorClass(cell.count) : 'bg-muted'}`}
-                    title={
-                      cell
-                        ? `${cell.date}: ${cell.count} ${cell.count === 1 ? 'тренировка' : cell.count < 5 ? 'тренировки' : 'тренировок'}`
-                        : ''
-                    }
-                  />
-                ))}
-              </div>
-            )
-          })}
+          {cols.map((col, index) => (
+            <HeatmapWeekColumn key={getWeekKey(col, index)} col={col} index={index} />
+          ))}
         </div>
       </div>
     </div>

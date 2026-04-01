@@ -15,15 +15,15 @@ export function HealthExport({ params }: HealthExportProps) {
   const handleExport = () => {
     setIsPending(true)
     exportHealthMarkdown(params)
-      .then(() => toast.success('Exported to Markdown'))
-      .catch(() => toast.error('Export failed'))
+      .then(() => toast.success('Экспортировано в Markdown'))
+      .catch(() => toast.error('Не удалось экспортировать данные'))
       .finally(() => setIsPending(false))
   }
 
   return (
     <Button variant="outline" size="sm" onClick={handleExport} disabled={isPending}>
       <Download className="h-4 w-4" />
-      {isPending ? 'Exporting…' : 'Export .md'}
+      {isPending ? 'Экспорт...' : 'Экспорт .md'}
     </Button>
   )
 }

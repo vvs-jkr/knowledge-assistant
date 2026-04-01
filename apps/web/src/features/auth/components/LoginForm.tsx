@@ -20,7 +20,7 @@ export function LoginForm() {
         onError: (err: unknown) => {
           const msg =
             (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            'Login failed'
+            'Не удалось войти'
           toast.error(msg)
         },
       })
@@ -74,7 +74,7 @@ export function LoginForm() {
       >
         {(field) => (
           <div className="space-y-1">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Пароль</Label>
             <Input
               id="password"
               type="password"
@@ -92,13 +92,13 @@ export function LoginForm() {
       </form.Field>
 
       <Button type="submit" className="w-full" disabled={login.isPending}>
-        {login.isPending ? 'Logging in…' : 'Log in'}
+        {login.isPending ? 'Вход...' : 'Войти'}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
-        No account?{' '}
+        Нет аккаунта?{' '}
         <Link to="/register" className="underline underline-offset-4 hover:text-foreground">
-          Register
+          Зарегистрироваться
         </Link>
       </p>
     </form>

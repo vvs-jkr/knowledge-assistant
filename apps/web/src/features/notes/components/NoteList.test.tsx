@@ -30,7 +30,7 @@ describe('NoteList', () => {
 
   it('shows empty state when no notes exist', async () => {
     render(<NoteList />)
-    expect(screen.getByText('No notes yet')).toBeDefined()
+    expect(screen.getByText('Заметок пока нет')).toBeDefined()
   })
 
   it('shows skeleton rows while loading', async () => {

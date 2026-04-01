@@ -33,7 +33,7 @@ export function CreatePlanDialog({ trigger }: CreatePlanDialogProps) {
           setDescription('')
         },
         onError: () => toast.error('Ошибка создания плана'),
-      },
+      }
     )
   }
 

@@ -130,9 +130,7 @@ export function StatsPanel() {
           />
         ) : (
           <div className="flex h-20 items-center justify-center text-sm text-muted-foreground">
-            {selectedExerciseId !== null
-              ? 'Нет данных по этому упражнению'
-              : 'Выберите упражнение'}
+            {selectedExerciseId !== null ? 'Нет данных по этому упражнению' : 'Выберите упражнение'}
           </div>
         )}
       </div>

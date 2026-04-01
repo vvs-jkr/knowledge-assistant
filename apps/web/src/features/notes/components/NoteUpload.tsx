@@ -13,12 +13,12 @@ export function NoteUpload() {
       if (acceptedFiles.length === 0) return
       upload.mutate(acceptedFiles, {
         onSuccess: (notes) => {
-          toast.success(`Uploaded ${notes.length} note${notes.length === 1 ? '' : 's'}`)
+          toast.success(`Загружено заметок: ${notes.length}`)
         },
         onError: (err: unknown) => {
           const msg =
             (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            'Upload failed'
+            'Не удалось загрузить файл'
           toast.error(msg)
         },
       })
@@ -46,11 +46,11 @@ export function NoteUpload() {
       <input {...getInputProps()} />
       <Upload className="h-5 w-5" />
       {upload.isPending ? (
-        <span>Uploading…</span>
+        <span>Загрузка...</span>
       ) : isDragActive ? (
-        <span>Drop files here</span>
+        <span>Отпустите файлы здесь</span>
       ) : (
-        <span>Drop .md files or click</span>
+        <span>Перетащите `.md`-файлы или нажмите для выбора</span>
       )}
     </div>
   )

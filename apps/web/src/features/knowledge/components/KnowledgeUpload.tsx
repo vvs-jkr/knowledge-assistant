@@ -12,9 +12,8 @@ export function KnowledgeUpload() {
     if (!files || files.length === 0) return
     const arr = Array.from(files)
     upload.mutate(arr, {
-      onSuccess: (entries) =>
-        toast.success(`Uploaded ${entries.length} file${entries.length !== 1 ? 's' : ''}`),
-      onError: () => toast.error('Upload failed'),
+      onSuccess: (entries) => toast.success(`Загружено файлов: ${entries.length}`),
+      onError: () => toast.error('Не удалось загрузить файлы'),
     })
   }
 
@@ -36,7 +35,7 @@ export function KnowledgeUpload() {
         disabled={upload.isPending}
       >
         <Upload className="mr-2 h-4 w-4" />
-        {upload.isPending ? 'Uploading…' : 'Upload notes'}
+        {upload.isPending ? 'Загрузка...' : 'Загрузить материалы'}
       </Button>
     </div>
   )

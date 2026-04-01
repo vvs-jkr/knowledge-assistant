@@ -20,7 +20,7 @@ export function RegisterForm() {
         onError: (err: unknown) => {
           const msg =
             (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            'Registration failed'
+            'Не удалось зарегистрироваться'
           toast.error(msg)
         },
       })
@@ -74,7 +74,7 @@ export function RegisterForm() {
       >
         {(field) => (
           <div className="space-y-1">
-            <Label htmlFor="reg-password">Password</Label>
+            <Label htmlFor="reg-password">Пароль</Label>
             <Input
               id="reg-password"
               type="password"
@@ -88,20 +88,20 @@ export function RegisterForm() {
               <p className="text-sm text-destructive">{field.state.meta.errors[0]}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Min 8 characters, one uppercase letter, one digit
+              Минимум 8 символов, одна заглавная буква и одна цифра
             </p>
           </div>
         )}
       </form.Field>
 
       <Button type="submit" className="w-full" disabled={register.isPending}>
-        {register.isPending ? 'Creating account…' : 'Create account'}
+        {register.isPending ? 'Создаю аккаунт...' : 'Создать аккаунт'}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{' '}
+        Уже есть аккаунт?{' '}
         <Link to="/login" className="underline underline-offset-4 hover:text-foreground">
-          Log in
+          Войти
         </Link>
       </p>
     </form>

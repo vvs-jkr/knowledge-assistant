@@ -8,6 +8,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { useCreateWorkoutLog } from '@/features/workouts/api/workouts.api'
+import type { FormEvent } from 'react'
 import { useState } from 'react'
 
 interface LogWorkoutDialogProps {
@@ -36,7 +37,7 @@ export function LogWorkoutDialog({ workoutId, workoutName }: LogWorkoutDialogPro
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     logMutation.mutate(
       {

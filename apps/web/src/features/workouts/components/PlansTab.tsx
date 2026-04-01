@@ -69,9 +69,7 @@ export function PlansTab() {
       </div>
 
       {!isLoading && !plans?.length && (
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Нет планов. Создай первый!
-        </p>
+        <p className="mt-6 text-center text-sm text-muted-foreground">Нет планов. Создай первый!</p>
       )}
     </div>
   )

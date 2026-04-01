@@ -12,7 +12,7 @@ describe('loginSchema', () => {
     const result = loginSchema.safeParse({ email: 'notanemail', password: 'Password1' })
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues[0].message).toBe('Invalid email')
+      expect(result.error.issues[0].message).toBe('Некорректный email')
     }
   })
 
@@ -20,7 +20,7 @@ describe('loginSchema', () => {
     const result = loginSchema.safeParse({ email: 'user@example.com', password: 'pass' })
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues[0].message).toBe('Min 8 characters')
+      expect(result.error.issues[0].message).toBe('Минимум 8 символов')
     }
   })
 
@@ -40,7 +40,7 @@ describe('registerSchema', () => {
     const result = registerSchema.safeParse({ email: 'user@example.com', password: 'password1' })
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.message.includes('uppercase'))).toBe(true)
+      expect(result.error.issues.some((i) => i.message.includes('заглавная'))).toBe(true)
     }
   })
 
@@ -48,7 +48,7 @@ describe('registerSchema', () => {
     const result = registerSchema.safeParse({ email: 'user@example.com', password: 'Passwords' })
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.message.includes('digit'))).toBe(true)
+      expect(result.error.issues.some((i) => i.message.includes('цифра'))).toBe(true)
     }
   })
 

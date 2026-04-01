@@ -32,7 +32,13 @@ export function WorkoutsMainPanel() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {tab === 'list' ? 'Таблица' : tab === 'cards' ? 'Карточки' : tab === 'stats' ? 'Статистика' : 'Планы'}
+              {tab === 'list'
+                ? 'Таблица'
+                : tab === 'cards'
+                  ? 'Карточки'
+                  : tab === 'stats'
+                    ? 'Статистика'
+                    : 'Планы'}
             </button>
           ))}
         </div>
@@ -79,11 +85,7 @@ export function WorkoutsMainPanel() {
 
       {activeTab === 'plans' && (
         <div className="flex-1 overflow-hidden">
-          {selectedPlanId !== null ? (
-            <PlanDetailView planId={selectedPlanId} />
-          ) : (
-            <PlansTab />
-          )}
+          {selectedPlanId !== null ? <PlanDetailView planId={selectedPlanId} /> : <PlansTab />}
         </div>
       )}
     </div>

@@ -42,14 +42,14 @@ export function HealthUpload() {
       },
       {
         onSuccess: (data) => {
-          toast.success(`Uploaded: ${data.metrics.length} metric(s) extracted`)
+          toast.success(`Загружено, извлечено показателей: ${data.metrics.length}`)
           setPendingFile(null)
           setLabName('')
         },
         onError: (err: unknown) => {
           const msg =
             (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            'Upload failed'
+            'Не удалось загрузить файл'
           toast.error(msg)
         },
       }
@@ -73,9 +73,9 @@ export function HealthUpload() {
         {pendingFile ? (
           <span className="font-medium text-foreground">{pendingFile.name}</span>
         ) : isDragActive ? (
-          <span>Drop file here</span>
+          <span>Отпустите файл здесь</span>
         ) : (
-          <span>Drop PDF or InBody CSV</span>
+          <span>Перетащите PDF или CSV из InBody</span>
         )}
       </div>
 
@@ -83,7 +83,7 @@ export function HealthUpload() {
         <>
           <div className="space-y-1.5">
             <Label htmlFor="lab-date" className="text-xs">
-              Lab date
+              Дата анализа
             </Label>
             <Input
               id="lab-date"
@@ -96,12 +96,12 @@ export function HealthUpload() {
 
           <div className="space-y-1.5">
             <Label htmlFor="lab-name" className="text-xs">
-              Lab name (optional)
+              Название лаборатории
             </Label>
             <Input
               id="lab-name"
               type="text"
-              placeholder="e.g. City Lab"
+              placeholder="например, Гемотест"
               value={labName}
               onChange={(e) => setLabName(e.target.value)}
               className="h-8 text-sm"
@@ -112,7 +112,7 @@ export function HealthUpload() {
 
       {isCSV && (
         <p className="text-xs text-muted-foreground">
-          Date and device are read automatically from the CSV.
+          Дата и устройство будут прочитаны из CSV автоматически.
         </p>
       )}
 
@@ -122,7 +122,7 @@ export function HealthUpload() {
         onClick={handleSubmit}
         disabled={!pendingFile || (!isCSV && !labDate) || upload.isPending}
       >
-        {upload.isPending ? 'Uploading...' : isCSV ? 'Upload CSV' : 'Upload & Extract'}
+        {upload.isPending ? 'Загрузка...' : isCSV ? 'Загрузить CSV' : 'Загрузить и распознать'}
       </Button>
     </div>
   )

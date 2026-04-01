@@ -134,8 +134,7 @@ const workoutsApi = {
       return workoutDetailSchema.parse(r.data)
     }),
 
-  delete: (id: string): Promise<void> =>
-    api.delete(`/workouts/${id}`).then(() => undefined),
+  delete: (id: string): Promise<void> => api.delete(`/workouts/${id}`).then(() => undefined),
 
   createLog: (body: CreateWorkoutLog): Promise<WorkoutLog> =>
     api.post<WorkoutLog>('/workouts/logs', body).then((r) => {
@@ -157,9 +156,9 @@ const workoutsApi = {
 
   plans: {
     list: (): Promise<WorkoutPlanSummary[]> =>
-      api.get<WorkoutPlanSummary[]>('/workouts/plans').then((r) =>
-        workoutPlanSummarySchema.array().parse(r.data),
-      ),
+      api
+        .get<WorkoutPlanSummary[]>('/workouts/plans')
+        .then((r) => workoutPlanSummarySchema.array().parse(r.data)),
 
     get: (id: string): Promise<WorkoutPlanDetail> =>
       api

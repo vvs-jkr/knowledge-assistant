@@ -75,7 +75,7 @@ export function useDeleteSession() {
     mutationFn: (id: string) => chatApi.deleteSession(id),
     onMutate: (id) => {
       qc.setQueryData<ChatSession[]>(['chat', 'sessions'], (prev) =>
-        (prev ?? []).filter((s) => s.id !== id),
+        (prev ?? []).filter((s) => s.id !== id)
       )
     },
     onError: () => {
@@ -132,8 +132,7 @@ export function useTrainingGoals() {
 export function useUpdateTrainingGoals() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: { goals?: string; active?: boolean }) =>
-      chatApi.updateTrainingGoals(body),
+    mutationFn: (body: { goals?: string; active?: boolean }) => chatApi.updateTrainingGoals(body),
     onSuccess: (updated) => {
       qc.setQueryData<TrainingGoals>(['training-goals'], updated)
     },

@@ -50,9 +50,9 @@ export function NoteViewer() {
     deleteNote.mutate(note.id, {
       onSuccess: () => {
         selectNote(null)
-        toast.success('Note deleted')
+        toast.success('Заметка удалена')
       },
-      onError: () => toast.error('Failed to delete note'),
+      onError: () => toast.error('Не удалось удалить заметку'),
     })
   }
 
@@ -66,7 +66,9 @@ export function NoteViewer() {
             variant="ghost"
             size="icon"
             onClick={() =>
-              void downloadNote(note.id, note.filename).catch(() => toast.error('Download failed'))
+              void downloadNote(note.id, note.filename).catch(() =>
+                toast.error('Не удалось скачать заметку')
+              )
             }
           >
             <Download className="h-4 w-4" />
@@ -82,18 +84,18 @@ export function NoteViewer() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete note?</AlertDialogTitle>
+                <AlertDialogTitle>Удалить заметку?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  &ldquo;{note.filename}&rdquo; will be permanently deleted. This cannot be undone.
+                  &ldquo;{note.filename}&rdquo; будет удалена без возможности восстановления.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>Отмена</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDelete}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  Delete
+                  Удалить
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

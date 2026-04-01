@@ -51,7 +51,12 @@ export function WorkoutCardGrid() {
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {pageItems.map((w) => (
-            <WorkoutCard key={w.id} workout={w} onClick={() => setSelectedId(w.id)} isCompleted={completedIds.has(w.id)} />
+            <WorkoutCard
+              key={w.id}
+              workout={w}
+              onClick={() => setSelectedId(w.id)}
+              isCompleted={completedIds.has(w.id)}
+            />
           ))}
         </div>
       </div>

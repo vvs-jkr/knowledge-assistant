@@ -20,11 +20,11 @@ interface NavItem {
 }
 
 const NAV_LINKS: NavItem[] = [
-  { to: '/notes', label: 'Notes', icon: FileText, countKey: 'notes' },
-  { to: '/health', label: 'Health', icon: Heart, countKey: 'health' },
-  { to: '/workouts', label: 'Workouts', icon: Activity, countKey: 'workouts' },
-  { to: '/knowledge', label: 'Knowledge', icon: BookOpen, countKey: 'knowledge' },
-  { to: '/chat', label: 'Coach', icon: MessageCircle },
+  { to: '/notes', label: 'Заметки', icon: FileText, countKey: 'notes' },
+  { to: '/health', label: 'Здоровье', icon: Heart, countKey: 'health' },
+  { to: '/workouts', label: 'Тренировки', icon: Activity, countKey: 'workouts' },
+  { to: '/knowledge', label: 'База знаний', icon: BookOpen, countKey: 'knowledge' },
+  { to: '/chat', label: 'Тренер', icon: MessageCircle },
 ]
 
 interface AppSidebarProps {
@@ -48,13 +48,13 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
           collapsed ? 'justify-center' : 'justify-between'
         )}
       >
-        {!collapsed && <span className="truncate text-sm font-semibold">Knowledge Hub</span>}
+        {!collapsed && <span className="truncate text-sm font-semibold">Knowledge Assistant</span>}
         <Button
           variant="ghost"
           size="icon"
           onClick={onToggle}
           className="h-8 w-8 shrink-0"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Развернуть боковую панель' : 'Свернуть боковую панель'}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>

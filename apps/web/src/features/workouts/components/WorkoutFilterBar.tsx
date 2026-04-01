@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
-import { WORKOUT_TYPE_LABELS } from '@/features/workouts/utils/workout-display'
 import { useWorkoutsStore } from '@/features/workouts/store/workouts.store'
+import { WORKOUT_TYPE_LABELS } from '@/features/workouts/utils/workout-display'
 import type { WorkoutType } from '@/shared/schemas/workouts.schema'
 import { Calendar, LayoutGrid, X } from 'lucide-react'
 

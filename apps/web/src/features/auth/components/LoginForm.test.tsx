@@ -27,13 +27,13 @@ describe('LoginForm', () => {
   it('renders email input, password input and submit button', () => {
     renderLoginForm()
     expect(screen.getByLabelText('Email')).toBeDefined()
-    expect(screen.getByLabelText('Password')).toBeDefined()
-    expect(screen.getByRole('button', { name: 'Log in' })).toBeDefined()
+    expect(screen.getByLabelText('Пароль')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Войти' })).toBeDefined()
   })
 
   it('shows a link to the register page', () => {
     renderLoginForm()
-    expect(screen.getByRole('link', { name: 'Register' })).toBeDefined()
+    expect(screen.getByRole('link', { name: 'Зарегистрироваться' })).toBeDefined()
   })
 
   it('shows validation error when email is blurred without input', async () => {
@@ -43,19 +43,19 @@ describe('LoginForm', () => {
     await user.click(emailInput)
     await user.tab()
     await waitFor(() => {
-      expect(screen.getByText('Invalid email')).toBeDefined()
+      expect(screen.getByText('Некорректный email')).toBeDefined()
     })
   })
 
   it('shows validation error when password is too short', async () => {
     const user = userEvent.setup()
     renderLoginForm()
-    const passwordInput = screen.getByLabelText('Password')
+    const passwordInput = screen.getByLabelText('Пароль')
     await user.click(passwordInput)
     await user.type(passwordInput, 'short')
     await user.tab()
     await waitFor(() => {
-      expect(screen.getByText('Min 8 characters')).toBeDefined()
+      expect(screen.getByText('Минимум 8 символов')).toBeDefined()
     })
   })
 })

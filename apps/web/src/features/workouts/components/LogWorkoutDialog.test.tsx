@@ -38,15 +38,15 @@ describe('LogWorkoutDialog', () => {
   it('clicking trigger opens the dialog', async () => {
     const user = userEvent.setup()
     render(<LogWorkoutDialog workoutId="w-1" workoutName="Morning WOD" />)
-    await user.click(screen.getByRole('button', { name: /log result/i }))
+    await user.click(screen.getByRole('button', { name: /записать результат/i }))
     expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
-    expect(document.body.querySelector('h2')?.textContent).toMatch(/log workout result/i)
+    expect(document.body.querySelector('h2')?.textContent).toMatch(/результат тренировки/i)
   })
 
   it('submitting the form calls mutate', async () => {
     const user = userEvent.setup()
     render(<LogWorkoutDialog workoutId="w-1" workoutName="Morning WOD" />)
-    await user.click(screen.getByRole('button', { name: /log result/i }))
+    await user.click(screen.getByRole('button', { name: /записать результат/i }))
     const saveBtn = document.body.querySelector('button[type="submit"]')
     if (saveBtn) await user.click(saveBtn as HTMLElement)
     expect(mockMutate).toHaveBeenCalledWith(
@@ -58,10 +58,10 @@ describe('LogWorkoutDialog', () => {
   it('clicking cancel calls reset', async () => {
     const user = userEvent.setup()
     render(<LogWorkoutDialog workoutId="w-1" workoutName="Morning WOD" />)
-    await user.click(screen.getByRole('button', { name: /log result/i }))
+    await user.click(screen.getByRole('button', { name: /записать результат/i }))
     expect(document.body.querySelector('[role="dialog"]')).not.toBeNull()
     const buttons = document.body.querySelectorAll('button[type="button"]')
-    const cancelButton = Array.from(buttons).find((b) => b.textContent === 'Cancel')
+    const cancelButton = Array.from(buttons).find((b) => b.textContent === 'Отмена')
     if (cancelButton) await user.click(cancelButton as HTMLElement)
     expect(mockReset).toHaveBeenCalled()
   })
@@ -69,7 +69,7 @@ describe('LogWorkoutDialog', () => {
   it('shows workout name in description', async () => {
     const user = userEvent.setup()
     render(<LogWorkoutDialog workoutId="w-1" workoutName="Fran" />)
-    await user.click(screen.getByRole('button', { name: /log result/i }))
+    await user.click(screen.getByRole('button', { name: /записать результат/i }))
     expect(document.body.textContent).toContain('Fran')
   })
 
@@ -78,7 +78,7 @@ describe('LogWorkoutDialog', () => {
     vi.mocked(mock).mockReturnValue(makeMutationMock({ isError: true }))
     const user = userEvent.setup()
     render(<LogWorkoutDialog workoutId="w-1" workoutName="Morning WOD" />)
-    await user.click(screen.getByRole('button', { name: /log result/i }))
-    expect(document.body.textContent).toContain('Failed to log workout')
+    await user.click(screen.getByRole('button', { name: /записать результат/i }))
+    expect(document.body.textContent).toContain('Ошибка сохранения. Попробуйте ещё раз.')
   })
 })

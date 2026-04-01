@@ -13,7 +13,7 @@ describe('HealthUpload', () => {
 
   it('renders the upload prompt text', () => {
     render(<HealthUpload />)
-    expect(screen.getByText('Drop PDF or InBody CSV')).toBeDefined()
+    expect(screen.getByText('Перетащите PDF или CSV из InBody')).toBeDefined()
   })
 
   it('renders a hidden file input', () => {
@@ -31,27 +31,27 @@ describe('HealthUpload', () => {
 
   it('renders lab date input', () => {
     render(<HealthUpload />)
-    expect(screen.getByLabelText('Lab date')).toBeDefined()
+    expect(screen.getByLabelText('Дата анализа')).toBeDefined()
   })
 
   it('renders lab name input', () => {
     render(<HealthUpload />)
-    expect(screen.getByLabelText('Lab name (optional)')).toBeDefined()
+    expect(screen.getByLabelText('Название лаборатории')).toBeDefined()
   })
 
   it('upload button is disabled when no file selected', () => {
     render(<HealthUpload />)
-    const btn = screen.getByRole('button', { name: /Upload & Extract/i })
+    const btn = screen.getByRole('button', { name: /Загрузить и распознать/i })
     expect(btn.hasAttribute('disabled')).toBe(true)
   })
 
-  it('shows "Analyzing..." when mutation is pending', async () => {
+  it('shows "Загрузка..." when mutation is pending', async () => {
     const { useUploadHealth } = await import('@/features/health/api/health.api')
     vi.mocked(useUploadHealth).mockReturnValueOnce({
       mutate: vi.fn(),
       isPending: true,
     } as unknown as ReturnType<typeof useUploadHealth>)
     render(<HealthUpload />)
-    expect(screen.getByText('Uploading...')).toBeDefined()
+    expect(screen.getByText('Загрузка...')).toBeDefined()
   })
 })

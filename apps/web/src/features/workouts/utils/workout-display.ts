@@ -1,12 +1,12 @@
 import type { WorkoutType } from '@/shared/schemas/workouts.schema'
 
 export const WORKOUT_TYPE_LABELS: Record<WorkoutType, string> = {
-  for_time: 'For Time',
+  for_time: 'На время',
   amrap: 'AMRAP',
   emom: 'EMOM',
-  tabata: 'Tabata',
-  lifting: 'Lifting',
-  rounds: 'Rounds',
+  tabata: 'Табата',
+  lifting: 'Силовая',
+  rounds: 'Раунды',
   wod: 'WOD',
   other: 'Другое',
 }

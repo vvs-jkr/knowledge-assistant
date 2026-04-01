@@ -43,8 +43,8 @@ export function KnowledgeList() {
   if (!entries?.length) {
     return (
       <div className="flex flex-col items-center justify-center gap-1 p-8 text-center text-sm text-muted-foreground">
-        <p>No entries yet</p>
-        <p>Upload .md or .txt files above</p>
+        <p>Записей пока нет</p>
+        <p>Загрузите `.md` или `.txt` файлы через форму выше</p>
       </div>
     )
   }
@@ -85,26 +85,26 @@ export function KnowledgeList() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete entry?</AlertDialogTitle>
+                    <AlertDialogTitle>Удалить запись?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      &ldquo;{entry.title}&rdquo; will be permanently deleted.
+                      &ldquo;{entry.title}&rdquo; будет удалена без возможности восстановления.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
                     <AlertDialogAction
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       onClick={() => {
                         deleteEntry.mutate(entry.id, {
                           onSuccess: () => {
                             if (selectedEntryId === entry.id) selectEntry(null)
-                            toast.success('Entry deleted')
+                            toast.success('Запись удалена')
                           },
-                          onError: () => toast.error('Failed to delete entry'),
+                          onError: () => toast.error('Не удалось удалить запись'),
                         })
                       }}
                     >
-                      Delete
+                      Удалить
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

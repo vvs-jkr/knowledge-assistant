@@ -7,7 +7,7 @@ export function KnowledgeMainPanel() {
   if (!selectedEntryId) {
     return (
       <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-        Select an entry to view
+        Выберите запись, чтобы открыть содержимое
       </div>
     )
   }

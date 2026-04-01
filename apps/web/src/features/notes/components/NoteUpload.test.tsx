@@ -13,7 +13,7 @@ describe('NoteUpload', () => {
 
   it('renders the upload prompt text', () => {
     render(<NoteUpload />)
-    expect(screen.getByText('Drop .md files or click')).toBeDefined()
+    expect(screen.getByText('Перетащите `.md`-файлы или нажмите для выбора')).toBeDefined()
   })
 
   it('renders a hidden file input', () => {
@@ -36,6 +36,6 @@ describe('NoteUpload', () => {
       isPending: true,
     } as unknown as ReturnType<typeof useUploadNotes>)
     render(<NoteUpload />)
-    expect(screen.getByText('Uploading…')).toBeDefined()
+    expect(screen.getByText('Загрузка...')).toBeDefined()
   })
 })
