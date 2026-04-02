@@ -22,6 +22,28 @@ pub struct DraftExercise {
     pub weight_note: Option<String>,
 }
 
+/// A generated item inside a workout section.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DraftSectionItem {
+    pub name: String,
+    pub sets: Option<u32>,
+    pub reps: Option<u32>,
+    pub weight_note: Option<String>,
+    pub prescription_text: Option<String>,
+    pub notes: Option<String>,
+}
+
+/// A generated section within a workout draft.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DraftWorkoutSection {
+    pub section_key: String,
+    pub section_role: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub notes: Option<String>,
+    pub items: Vec<DraftSectionItem>,
+}
+
 /// A generated workout draft returned by the AI.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WorkoutDraft {
@@ -33,6 +55,8 @@ pub struct WorkoutDraft {
     pub duration_mins: Option<u32>,
     /// Optional coaching notes.
     pub notes: Option<String>,
+    /// Structured A/B/C/D sections.
+    pub sections: Vec<DraftWorkoutSection>,
     /// Exercise list.
     pub exercises: Vec<DraftExercise>,
 }
@@ -425,6 +449,25 @@ Return ONLY valid JSON -- no markdown fences, no extra text -- with exactly this
   "workout_type": "lifting",
   "duration_mins": 60,
   "notes": "Optional coaching notes",
+  "sections": [
+    {
+      "section_key": "A",
+      "section_role": "warmup",
+      "title": "Разминка",
+      "description": "Optional short section description",
+      "notes": "Optional coach notes",
+      "items": [
+        {
+          "name": "Exercise Name",
+          "sets": 2,
+          "reps": 10,
+          "weight_note": null,
+          "prescription_text": "2 раунда в свободном темпе",
+          "notes": null
+        }
+      ]
+    }
+  ],
   "exercises": [
     {
       "name": "Exercise Name",
@@ -439,9 +482,14 @@ Rules:
 - workout_type: one of "for_time", "amrap", "emom", "tabata", "lifting", "rounds", "other"
 - duration_mins: integer or null
 - notes: brief coaching notes or null
-- exercises: at least 3, ordered logically (warm-up to cool-down)
+- sections: preferred structure with 3-4 sections ordered logically, usually A/B/C and optionally D
+- section_key: usually "A", "B", "C", optionally "D"
+- section_role: one of "warmup", "strength_skill", "conditioning", "accessory_cooldown"
+- items: at least 1 item per section
 - sets/reps: integers or null if not applicable (e.g. cardio)
 - weight_note: qualitative guidance or null
+- prescription_text: concise Russian prescription when sets/reps alone are insufficient
+- exercises: flattened legacy exercise list for compatibility, ordered from first section to last section
 - Use the training history and analysis (if provided) to personalise the workout: respect the athlete's patterns, address muscle imbalances, and build on their methodology
 - Occasionally you may suggest repeating a successful workout from history, noting it's from their archive
 - Always respond in Russian language (name, notes, weight_note fields)"#

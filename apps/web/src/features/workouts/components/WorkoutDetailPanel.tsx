@@ -46,6 +46,39 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
         {workout.rounds !== null && <span>{workout.rounds} раундов</span>}
       </div>
 
+      {workout.sections.length > 0 && (
+        <div className="space-y-3">
+          {workout.sections.map((section) => (
+            <div key={section.id} className="rounded-lg border p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Badge variant="outline">{section.section_key}</Badge>
+                <h3 className="text-sm font-semibold">{section.title}</h3>
+              </div>
+              {section.description && (
+                <p className="mb-2 text-sm text-muted-foreground">{section.description}</p>
+              )}
+              <div className="space-y-2">
+                {section.items.map((item) => (
+                  <div key={item.id} className="flex items-baseline justify-between gap-3 text-sm">
+                    <span className="font-medium">{item.display_name}</span>
+                    <span className="text-right text-muted-foreground">
+                      {[
+                        item.sets !== null ? `${item.sets} подх.` : null,
+                        item.reps !== null ? `x ${item.reps} повт.` : null,
+                        item.weight_note,
+                        item.prescription_text || null,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <WorkoutExerciseList exercises={workout.exercises} />
 
       {workout.raw_text !== null && (

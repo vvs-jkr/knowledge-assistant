@@ -7,8 +7,11 @@ import { WorkoutFilterBar } from './WorkoutFilterBar'
 beforeEach(() => {
   useWorkoutsStore.setState({
     selectedWorkoutId: null,
+    selectedArchiveWorkoutId: null,
     activeTab: 'list',
+    selectedPlanId: null,
     filters: { workout_type: null, from: null, to: null },
+    archiveFilters: { review_status: null, year: null },
   })
 })
 

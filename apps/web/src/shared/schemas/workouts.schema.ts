@@ -43,7 +43,33 @@ export const workoutExerciseSchema = z.object({
   notes: z.string().nullable(),
 })
 
+export const workoutSectionItemSchema = z.object({
+  id: z.string(),
+  exercise_id: z.string().nullable(),
+  display_name: z.string(),
+  sets: z.number().nullable(),
+  reps: z.number().nullable(),
+  weight_kg: z.number().nullable(),
+  weight_note: z.string().nullable(),
+  duration_secs: z.number().nullable(),
+  prescription_text: z.string(),
+  notes: z.string(),
+  order_index: z.number(),
+})
+
+export const workoutSectionSchema = z.object({
+  id: z.string(),
+  section_key: z.string(),
+  section_role: z.string(),
+  title: z.string(),
+  description: z.string(),
+  notes: z.string(),
+  order_index: z.number(),
+  items: z.array(workoutSectionItemSchema),
+})
+
 export const workoutDetailSchema = workoutSummarySchema.omit({ exercise_count: true }).extend({
+  sections: z.array(workoutSectionSchema),
   exercises: z.array(workoutExerciseSchema),
   raw_text: z.string().nullable(),
   source_file: z.string().nullable(),
@@ -180,6 +206,8 @@ export type WorkoutType = z.infer<typeof workoutTypeSchema>
 export type WorkoutSummary = z.infer<typeof workoutSummarySchema>
 export type WorkoutDetail = z.infer<typeof workoutDetailSchema>
 export type WorkoutExercise = z.infer<typeof workoutExerciseSchema>
+export type WorkoutSection = z.infer<typeof workoutSectionSchema>
+export type WorkoutSectionItem = z.infer<typeof workoutSectionItemSchema>
 export type ExerciseInfo = z.infer<typeof exerciseInfoSchema>
 export type WorkoutLog = z.infer<typeof workoutLogSchema>
 export type HeatmapEntry = z.infer<typeof heatmapEntrySchema>

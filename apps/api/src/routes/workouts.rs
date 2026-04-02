@@ -18,9 +18,10 @@ use crate::{
         validate_date, validate_workout_type, CreateLogRequest, CreatePlanRequest,
         CreateWorkoutRequest, EmbedAllResponse, ExerciseInfo, ExerciseInput, ExerciseProgress,
         ExercisesQuery, GenerateWorkoutRequest, GeneratedWorkoutResponse, HeatmapEntry, LogsQuery,
-        StatsQuery, TypeDistribution, UpdatePlanRequest, UpdateWorkoutRequest, VolumeEntry,
-        WorkoutAnalysis, WorkoutDetail, WorkoutExercise, WorkoutLog, WorkoutPlanDetail,
-        WorkoutPlanSummary, WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
+        SectionItemInput, StatsQuery, TypeDistribution, UpdatePlanRequest, UpdateWorkoutRequest,
+        VolumeEntry, WorkoutAnalysis, WorkoutDetail, WorkoutExercise, WorkoutLog,
+        WorkoutPlanDetail, WorkoutPlanSummary, WorkoutSection, WorkoutSectionInput,
+        WorkoutSectionItem, WorkoutStats, WorkoutSummary, WorkoutsQuery, VALID_SOURCE_TYPES,
     },
 };
 
@@ -189,9 +190,18 @@ async fn create_workout(
     .await
     .map_err(AppError::from)?;
 
+    if let Some(sections) = &body.sections {
+        insert_workout_sections(&mut tx, &workout_id, sections).await?;
+    }
+
     // Insert exercises if provided.
     if let Some(exercises) = &body.exercises {
         insert_exercises(&mut tx, &workout_id, exercises).await?;
+    } else if let Some(sections) = &body.sections {
+        let derived = section_inputs_to_exercises(sections);
+        if !derived.is_empty() {
+            insert_exercises(&mut tx, &workout_id, &derived).await?;
+        }
     }
 
     tx.commit().await.map_err(AppError::from)?;
@@ -289,6 +299,15 @@ async fn update_workout(
     .await
     .map_err(AppError::from)?;
 
+    if let Some(sections) = &body.sections {
+        sqlx::query("DELETE FROM workout_sections WHERE workout_id = ?")
+            .bind(&id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        insert_workout_sections(&mut tx, &id, sections).await?;
+    }
+
     // Replace exercises if provided.
     if let Some(exercises) = &body.exercises {
         sqlx::query("DELETE FROM workout_exercises WHERE workout_id = ?")
@@ -298,6 +317,17 @@ async fn update_workout(
             .map_err(AppError::from)?;
 
         insert_exercises(&mut tx, &id, exercises).await?;
+    } else if let Some(sections) = &body.sections {
+        sqlx::query("DELETE FROM workout_exercises WHERE workout_id = ?")
+            .bind(&id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+
+        let derived = section_inputs_to_exercises(sections);
+        if !derived.is_empty() {
+            insert_exercises(&mut tx, &id, &derived).await?;
+        }
     }
 
     tx.commit().await.map_err(AppError::from)?;
@@ -885,6 +915,65 @@ async fn fetch_workout_detail(
     .map_err(AppError::from)?
     .ok_or(AppError::NotFound)?;
 
+    let section_rows = sqlx::query(
+        r"SELECT id, section_key, section_role, title, description, notes, order_index
+          FROM workout_sections
+          WHERE workout_id = ?
+          ORDER BY order_index ASC, created_at ASC",
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let mut sections = Vec::new();
+    for section_row in section_rows {
+        let section_id: String = section_row.try_get("id").map_err(AppError::from)?;
+        let item_rows = sqlx::query(
+            r"SELECT id, exercise_id, display_name, sets, reps, weight_kg, weight_note,
+                     duration_secs, prescription_text, notes, order_index
+              FROM workout_section_items
+              WHERE section_id = ?
+              ORDER BY order_index ASC, created_at ASC",
+        )
+        .bind(&section_id)
+        .fetch_all(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+        let items = item_rows
+            .into_iter()
+            .map(|r| -> ApiResult<WorkoutSectionItem> {
+                Ok(WorkoutSectionItem {
+                    id: r.try_get("id").map_err(AppError::from)?,
+                    exercise_id: r.try_get("exercise_id").map_err(AppError::from)?,
+                    display_name: r.try_get("display_name").map_err(AppError::from)?,
+                    sets: r.try_get("sets").map_err(AppError::from)?,
+                    reps: r.try_get("reps").map_err(AppError::from)?,
+                    weight_kg: r.try_get("weight_kg").map_err(AppError::from)?,
+                    weight_note: r.try_get("weight_note").map_err(AppError::from)?,
+                    duration_secs: r.try_get("duration_secs").map_err(AppError::from)?,
+                    prescription_text: r.try_get("prescription_text").map_err(AppError::from)?,
+                    notes: r.try_get("notes").map_err(AppError::from)?,
+                    order_index: r.try_get("order_index").map_err(AppError::from)?,
+                })
+            })
+            .collect::<ApiResult<Vec<_>>>()?;
+
+        sections.push(WorkoutSection {
+            id: section_id,
+            section_key: section_row.try_get("section_key").map_err(AppError::from)?,
+            section_role: section_row
+                .try_get("section_role")
+                .map_err(AppError::from)?,
+            title: section_row.try_get("title").map_err(AppError::from)?,
+            description: section_row.try_get("description").map_err(AppError::from)?,
+            notes: section_row.try_get("notes").map_err(AppError::from)?,
+            order_index: section_row.try_get("order_index").map_err(AppError::from)?,
+            items,
+        });
+    }
+
     let ex_rows = sqlx::query(
         r"SELECT we.id, we.exercise_id, e.name AS exercise_name, e.muscle_groups,
                  we.reps, we.sets, we.weight_kg, we.weight_note,
@@ -935,6 +1024,7 @@ async fn fetch_workout_detail(
         plan_id: row.try_get("plan_id").map_err(AppError::from)?,
         created_at: row.try_get("created_at").map_err(AppError::from)?,
         updated_at: row.try_get("updated_at").map_err(AppError::from)?,
+        sections,
         exercises,
     })
 }
@@ -1060,6 +1150,139 @@ async fn insert_exercises(
     }
 
     Ok(())
+}
+
+async fn insert_workout_sections(
+    conn: &mut sqlx::SqliteConnection,
+    workout_id: &str,
+    sections: &[WorkoutSectionInput],
+) -> ApiResult<()> {
+    for (section_idx, section) in sections.iter().enumerate() {
+        let section_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        #[allow(clippy::cast_possible_wrap)]
+        let order_index = section.order_index.unwrap_or(section_idx as i64);
+
+        sqlx::query(
+            r"INSERT INTO workout_sections
+              (id, workout_id, section_key, section_role, title, description, notes, order_index, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&section_id)
+        .bind(workout_id)
+        .bind(&section.section_key)
+        .bind(&section.section_role)
+        .bind(&section.title)
+        .bind(&section.description.clone().unwrap_or_default())
+        .bind(&section.notes.clone().unwrap_or_default())
+        .bind(order_index)
+        .bind(&now)
+        .execute(&mut *conn)
+        .await
+        .map_err(AppError::from)?;
+
+        for (item_idx, item) in section.items.as_deref().unwrap_or(&[]).iter().enumerate() {
+            let item_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+            #[allow(clippy::cast_possible_wrap)]
+            let item_order_index = item.order_index.unwrap_or(item_idx as i64);
+            let (exercise_id, display_name) = resolve_section_item(conn, item).await?;
+
+            sqlx::query(
+                r"INSERT INTO workout_section_items
+                  (id, section_id, exercise_id, display_name, sets, reps, weight_kg, weight_note,
+                   duration_secs, prescription_text, notes, order_index, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&item_id)
+            .bind(&section_id)
+            .bind(exercise_id.as_deref())
+            .bind(&display_name)
+            .bind(item.sets)
+            .bind(item.reps)
+            .bind(item.weight_kg)
+            .bind(item.weight_note.as_deref())
+            .bind(item.duration_secs)
+            .bind(item.prescription_text.as_deref().unwrap_or(""))
+            .bind(item.notes.as_deref().unwrap_or(""))
+            .bind(item_order_index)
+            .bind(&now)
+            .execute(&mut *conn)
+            .await
+            .map_err(AppError::from)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn resolve_section_item(
+    conn: &mut sqlx::SqliteConnection,
+    item: &SectionItemInput,
+) -> ApiResult<(Option<String>, String)> {
+    if let Some(eid) = &item.exercise_id {
+        let exists = sqlx::query("SELECT id, name FROM exercises WHERE id = ?")
+            .bind(eid)
+            .fetch_optional(&mut *conn)
+            .await
+            .map_err(AppError::from)?;
+        let row = exists.ok_or(AppError::NotFound)?;
+        let name: String = row.try_get("name").map_err(AppError::from)?;
+        return Ok((Some(eid.clone()), name));
+    }
+
+    if let Some(name) = &item.name {
+        let mg_json = serde_json::to_string(&item.muscle_groups.as_deref().unwrap_or(&[]))
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize muscle_groups: {e}")))?;
+
+        sqlx::query("INSERT OR IGNORE INTO exercises (name, muscle_groups) VALUES (?, ?)")
+            .bind(name)
+            .bind(&mg_json)
+            .execute(&mut *conn)
+            .await
+            .map_err(AppError::from)?;
+
+        let row = sqlx::query("SELECT id FROM exercises WHERE name = ?")
+            .bind(name)
+            .fetch_one(&mut *conn)
+            .await
+            .map_err(AppError::from)?;
+
+        let exercise_id: String = row.try_get("id").map_err(AppError::from)?;
+        return Ok((Some(exercise_id), name.clone()));
+    }
+
+    if let Some(text) = &item.prescription_text {
+        return Ok((None, text.clone()));
+    }
+
+    Err(AppError::BadRequest(
+        "Each section item must have exercise_id, name, or prescription_text".into(),
+    ))
+}
+
+fn section_inputs_to_exercises(sections: &[WorkoutSectionInput]) -> Vec<ExerciseInput> {
+    let mut derived = Vec::new();
+    for section in sections {
+        for item in section.items.as_deref().unwrap_or(&[]) {
+            if item.exercise_id.is_none() && item.name.as_deref().unwrap_or("").trim().is_empty() {
+                continue;
+            }
+
+            derived.push(ExerciseInput {
+                exercise_id: item.exercise_id.clone(),
+                name: item.name.clone(),
+                muscle_groups: item.muscle_groups.clone(),
+                reps: item.reps,
+                sets: item.sets,
+                weight_kg: item.weight_kg,
+                weight_note: item.weight_note.clone().or(item.prescription_text.clone()),
+                duration_secs: item.duration_secs,
+                order_index: item.order_index,
+                notes: item.notes.clone(),
+            });
+        }
+    }
+    derived
 }
 
 // ---------------------------------------------------------------------------

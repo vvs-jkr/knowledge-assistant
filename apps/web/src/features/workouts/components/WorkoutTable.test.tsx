@@ -21,14 +21,19 @@ function setupStore() {
   mockUseWorkoutsStore.mockImplementation((selector) => {
     const state = {
       selectedWorkoutId: null,
+      selectedArchiveWorkoutId: null,
       activeTab: 'list' as const,
       selectedPlanId: null,
       filters: mockFilters,
+      archiveFilters: { review_status: null, year: null },
       selectWorkout: mockSelectWorkout,
+      selectArchiveWorkout: vi.fn(),
       setActiveTab: vi.fn(),
       selectPlan: vi.fn(),
       setFilter: vi.fn(),
+      setArchiveFilter: vi.fn(),
       resetFilters: vi.fn(),
+      resetArchiveFilters: vi.fn(),
     }
     return selector(state)
   })

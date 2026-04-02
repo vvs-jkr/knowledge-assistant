@@ -28,22 +28,57 @@ function DraftPreview({ draft }: { draft: WorkoutDraft }) {
 
       {draft.notes && <p className="text-sm text-muted-foreground italic">{draft.notes}</p>}
 
-      <div className="space-y-1">
-        {draft.exercises.map((ex, i) => (
-          <div key={`${ex.name}-${i}`} className="flex items-baseline justify-between text-sm">
-            <span className="font-medium">{ex.name}</span>
-            <span className="text-muted-foreground">
-              {[
-                ex.sets !== null ? `${ex.sets} подх.` : null,
-                ex.reps !== null ? `x ${ex.reps} повт.` : null,
-                ex.weight_note,
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            </span>
-          </div>
-        ))}
-      </div>
+      {draft.sections.length > 0 ? (
+        <div className="space-y-3">
+          {draft.sections.map((section) => (
+            <div key={`${section.section_key}-${section.title}`} className="space-y-1">
+              <p className="text-sm font-semibold">
+                {section.section_key}. {section.title}
+              </p>
+              {section.description && (
+                <p className="text-xs text-muted-foreground">{section.description}</p>
+              )}
+              <div className="space-y-1">
+                {section.items.map((item, i) => (
+                  <div
+                    key={`${section.section_key}-${item.name}-${i}`}
+                    className="flex items-baseline justify-between gap-3 text-sm"
+                  >
+                    <span className="font-medium">{item.name}</span>
+                    <span className="text-right text-muted-foreground">
+                      {[
+                        item.sets !== null ? `${item.sets} подх.` : null,
+                        item.reps !== null ? `x ${item.reps} повт.` : null,
+                        item.weight_note,
+                        item.prescription_text,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {draft.exercises.map((ex, i) => (
+            <div key={`${ex.name}-${i}`} className="flex items-baseline justify-between text-sm">
+              <span className="font-medium">{ex.name}</span>
+              <span className="text-muted-foreground">
+                {[
+                  ex.sets !== null ? `${ex.sets} подх.` : null,
+                  ex.reps !== null ? `x ${ex.reps} повт.` : null,
+                  ex.weight_note,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -74,7 +109,27 @@ export function GenerateWorkoutDialog() {
         name: result.name,
         workout_type: result.workout_type,
         ...(result.duration_mins !== null ? { duration_mins: result.duration_mins } : {}),
+        ...(result.notes !== null ? { raw_text: result.notes } : {}),
         source_type: 'generated',
+        sections: result.sections.map((section, sectionIndex) => ({
+          section_key: section.section_key,
+          section_role: section.section_role,
+          title: section.title,
+          ...(section.description !== null ? { description: section.description } : {}),
+          ...(section.notes !== null ? { notes: section.notes } : {}),
+          order_index: sectionIndex,
+          items: section.items.map((item, itemIndex) => ({
+            name: item.name,
+            ...(item.sets !== null ? { sets: item.sets } : {}),
+            ...(item.reps !== null ? { reps: item.reps } : {}),
+            ...(item.weight_note !== null ? { weight_note: item.weight_note } : {}),
+            ...(item.prescription_text !== null
+              ? { prescription_text: item.prescription_text }
+              : {}),
+            ...(item.notes !== null ? { notes: item.notes } : {}),
+            order_index: itemIndex,
+          })),
+        })),
         exercises: result.exercises.map((ex, i) => ({
           name: ex.name,
           order_index: i,

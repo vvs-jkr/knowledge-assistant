@@ -41,6 +41,30 @@ type ExerciseInput = {
   notes?: string
 }
 
+type WorkoutSectionItemInput = {
+  exercise_id?: string
+  name?: string
+  muscle_groups?: string[]
+  reps?: number
+  sets?: number
+  weight_kg?: number
+  weight_note?: string
+  duration_secs?: number
+  prescription_text?: string
+  notes?: string
+  order_index?: number
+}
+
+type WorkoutSectionInput = {
+  section_key: string
+  section_role: string
+  title: string
+  description?: string
+  notes?: string
+  order_index?: number
+  items?: WorkoutSectionItemInput[]
+}
+
 type UpdateExerciseInput = {
   exercise_id?: string
   name?: string
@@ -73,6 +97,7 @@ type CreateWorkoutInput = {
   raw_text?: string
   year_confidence?: number
   plan_id?: string
+  sections?: WorkoutSectionInput[]
   exercises?: ExerciseInput[]
 }
 

@@ -65,6 +65,35 @@ pub struct WorkoutExercise {
     pub notes: Option<String>,
 }
 
+/// A single item within a structured workout section.
+#[derive(Debug, Serialize)]
+pub struct WorkoutSectionItem {
+    pub id: String,
+    pub exercise_id: Option<String>,
+    pub display_name: String,
+    pub sets: Option<i64>,
+    pub reps: Option<i64>,
+    pub weight_kg: Option<f64>,
+    pub weight_note: Option<String>,
+    pub duration_secs: Option<i64>,
+    pub prescription_text: String,
+    pub notes: String,
+    pub order_index: i64,
+}
+
+/// A structured section of a workout such as A/B/C/D.
+#[derive(Debug, Serialize)]
+pub struct WorkoutSection {
+    pub id: String,
+    pub section_key: String,
+    pub section_role: String,
+    pub title: String,
+    pub description: String,
+    pub notes: String,
+    pub order_index: i64,
+    pub items: Vec<WorkoutSectionItem>,
+}
+
 /// Full workout detail including exercises.
 #[derive(Debug, Serialize)]
 pub struct WorkoutDetail {
@@ -81,6 +110,7 @@ pub struct WorkoutDetail {
     pub plan_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    pub sections: Vec<WorkoutSection>,
     pub exercises: Vec<WorkoutExercise>,
 }
 
@@ -187,6 +217,34 @@ pub struct ExerciseInput {
     pub notes: Option<String>,
 }
 
+/// A single item within a section submitted when creating or updating a workout.
+#[derive(Debug, Deserialize)]
+pub struct SectionItemInput {
+    pub exercise_id: Option<String>,
+    pub name: Option<String>,
+    pub muscle_groups: Option<Vec<String>>,
+    pub reps: Option<i64>,
+    pub sets: Option<i64>,
+    pub weight_kg: Option<f64>,
+    pub weight_note: Option<String>,
+    pub duration_secs: Option<i64>,
+    pub prescription_text: Option<String>,
+    pub notes: Option<String>,
+    pub order_index: Option<i64>,
+}
+
+/// A section of a workout submitted when creating or updating a workout.
+#[derive(Debug, Deserialize)]
+pub struct WorkoutSectionInput {
+    pub section_key: String,
+    pub section_role: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub notes: Option<String>,
+    pub order_index: Option<i64>,
+    pub items: Option<Vec<SectionItemInput>>,
+}
+
 /// Request body for `POST /workouts/plans`.
 #[derive(Debug, Deserialize)]
 pub struct CreatePlanRequest {
@@ -215,6 +273,7 @@ pub struct CreateWorkoutRequest {
     pub raw_text: Option<String>,
     pub year_confidence: Option<f64>,
     pub plan_id: Option<String>,
+    pub sections: Option<Vec<WorkoutSectionInput>>,
     pub exercises: Option<Vec<ExerciseInput>>,
 }
 
@@ -230,6 +289,7 @@ pub struct UpdateWorkoutRequest {
     pub source_file: Option<String>,
     pub raw_text: Option<String>,
     pub year_confidence: Option<f64>,
+    pub sections: Option<Vec<WorkoutSectionInput>>,
     /// When `Some`, replaces all exercises; when `None`, leaves them unchanged.
     pub exercises: Option<Vec<ExerciseInput>>,
 }

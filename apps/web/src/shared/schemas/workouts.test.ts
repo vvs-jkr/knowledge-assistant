@@ -36,6 +36,7 @@ const baseExercise = {
 
 const baseDetail = {
   ...baseSummary,
+  sections: [],
   exercises: [baseExercise],
   raw_text: null,
   source_file: null,

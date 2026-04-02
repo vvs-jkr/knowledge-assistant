@@ -259,6 +259,66 @@ async fn create_workout_with_named_exercises_upserts_and_returns_exercises() {
 }
 
 #[tokio::test]
+async fn create_workout_with_sections_returns_structured_sections_and_legacy_exercises() {
+    let server = make_server().await;
+    let token = register_and_get_token(&server, "wk_sections_create@example.com").await;
+    let (name, val) = bearer(&token);
+
+    let res = server
+        .post("/workouts")
+        .add_header(name, val)
+        .json(&json!({
+            "date": "2026-03-10",
+            "name": "Sectioned Workout",
+            "workout_type": "other",
+            "sections": [
+                {
+                    "section_key": "A",
+                    "section_role": "warmup",
+                    "title": "Разминка",
+                    "items": [
+                        {
+                            "name": "Row",
+                            "prescription_text": "5 мин спокойно"
+                        }
+                    ]
+                },
+                {
+                    "section_key": "B",
+                    "section_role": "strength_skill",
+                    "title": "Сила",
+                    "items": [
+                        {
+                            "name": "Front Squat",
+                            "sets": 5,
+                            "reps": 3,
+                            "weight_note": "тяжело"
+                        }
+                    ]
+                }
+            ]
+        }))
+        .await;
+
+    res.assert_status(StatusCode::CREATED);
+    let body = res.json::<Value>();
+    assert_eq!(body["sections"].as_array().expect("sections").len(), 2);
+    assert_eq!(
+        body["sections"][0]["section_key"]
+            .as_str()
+            .expect("section_key"),
+        "A"
+    );
+    assert_eq!(body["exercises"].as_array().expect("exercises").len(), 2);
+    assert_eq!(
+        body["exercises"][1]["exercise_name"]
+            .as_str()
+            .expect("exercise_name"),
+        "Front Squat"
+    );
+}
+
+#[tokio::test]
 async fn list_workouts_returns_created_workouts() {
     let server = make_server().await;
     let token = register_and_get_token(&server, "wk_list_returns@example.com").await;
@@ -459,6 +519,66 @@ async fn update_workout_exercises_replaces_all() {
     assert_eq!(
         exercises[0]["exercise_name"].as_str().expect("name"),
         "NewExercise1"
+    );
+}
+
+#[tokio::test]
+async fn update_workout_sections_replaces_existing_sections() {
+    let server = make_server().await;
+    let token = register_and_get_token(&server, "wk_sections_update@example.com").await;
+    let (name, val) = bearer(&token);
+
+    let created = server
+        .post("/workouts")
+        .add_header(
+            axum::http::header::AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {token}")).expect("header"),
+        )
+        .json(&json!({
+            "date": "2026-03-10",
+            "name": "Section Replace Test",
+            "sections": [
+                {
+                    "section_key": "A",
+                    "section_role": "warmup",
+                    "title": "Разминка",
+                    "items": [{"name": "Bike", "prescription_text": "4 мин"}]
+                }
+            ]
+        }))
+        .await
+        .json::<Value>();
+
+    let id = created["id"].as_str().expect("id");
+
+    let res = server
+        .put(&format!("/workouts/{id}"))
+        .add_header(name, val)
+        .json(&json!({
+            "sections": [
+                {
+                    "section_key": "B",
+                    "section_role": "conditioning",
+                    "title": "Комплекс",
+                    "items": [{"name": "Burpee", "reps": 12}]
+                }
+            ]
+        }))
+        .await;
+
+    res.assert_status_ok();
+    let body = res.json::<Value>();
+    let sections = body["sections"].as_array().expect("sections");
+    assert_eq!(sections.len(), 1);
+    assert_eq!(
+        sections[0]["section_key"].as_str().expect("section_key"),
+        "B"
+    );
+    assert_eq!(
+        sections[0]["items"][0]["display_name"]
+            .as_str()
+            .expect("display_name"),
+        "Burpee"
     );
 }
 
