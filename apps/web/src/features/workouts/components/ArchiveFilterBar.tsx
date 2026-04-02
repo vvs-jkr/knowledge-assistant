@@ -31,22 +31,26 @@ export function ArchiveFilterBar() {
 
   const hasFilters = filters.review_status !== null || filters.year !== null
 
-  const selectedIds =
-    selectedArchiveWorkoutIds.length > 0
-      ? selectedArchiveWorkoutIds
-      : (items ?? []).filter((item) => item.review_status === 'needs_review').map((item) => item.id)
+  const selectedIds = selectedArchiveWorkoutIds
+  const selectedCount = selectedIds.length
 
   const runBatch = async (payload: {
     review_status?: ArchiveReviewStatus
     ready_for_retrieval?: boolean
+    confirmMessage?: string
   }) => {
     if (selectedIds.length === 0) {
       toast.error('Нет выбранных карточек для batch review')
       return
     }
+    if (payload.confirmMessage && !window.confirm(payload.confirmMessage)) {
+      return
+    }
+
+    const { confirmMessage: _confirmMessage, ...request } = payload
 
     await batchReview.mutateAsync(
-      { ids: selectedIds, ...payload },
+      { ids: selectedIds, ...request },
       {
         onSuccess: (result) => {
           clearArchiveWorkoutSelection()
@@ -110,20 +114,42 @@ export function ArchiveFilterBar() {
       )}
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="text-sm text-muted-foreground">
+          {selectedCount > 0 ? `Выбрано: ${selectedCount}` : `Карточек: ${(items ?? []).length}`}
+        </div>
+        {selectedCount > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearArchiveWorkoutSelection}
+            className="h-8 px-2 text-muted-foreground hover:text-foreground"
+          >
+            Снять выбор
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
-          disabled={batchReview.isPending || selectedIds.length === 0}
-          onClick={() => void runBatch({ review_status: 'reviewed' })}
+          disabled={batchReview.isPending || selectedCount === 0}
+          onClick={() =>
+            void runBatch({
+              review_status: 'reviewed',
+              confirmMessage: `Отметить как проверенные ${selectedCount} карточек?`,
+            })
+          }
         >
           Отметить как проверенные
         </Button>
         <Button
           variant="outline"
           size="sm"
-          disabled={batchReview.isPending || selectedIds.length === 0}
+          disabled={batchReview.isPending || selectedCount === 0}
           onClick={() =>
-            void runBatch({ review_status: 'corrected', ready_for_retrieval: true })
+            void runBatch({
+              review_status: 'corrected',
+              ready_for_retrieval: true,
+              confirmMessage: `Пометить ${selectedCount} карточек как исправленные и разрешить их для RAG?`,
+            })
           }
         >
           Исправлено и в RAG

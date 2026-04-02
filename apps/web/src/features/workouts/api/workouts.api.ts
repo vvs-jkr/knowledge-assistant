@@ -418,9 +418,13 @@ export function useDeletePlan() {
 }
 
 export function useArchivedWorkouts(params?: ArchivedWorkoutsQuery) {
+  const resolvedParams = {
+    limit: 5000,
+    ...params,
+  }
   return useQuery({
-    queryKey: ['archive', 'workouts', 'list', params],
-    queryFn: () => workoutsApi.archive.list(params),
+    queryKey: ['archive', 'workouts', 'list', resolvedParams],
+    queryFn: () => workoutsApi.archive.list(resolvedParams),
     staleTime: 30_000,
   })
 }

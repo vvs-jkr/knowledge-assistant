@@ -46,7 +46,7 @@ async fn list_archived_workouts(
     State(state): State<AppState>,
     Query(params): Query<ArchivedWorkoutsQuery>,
 ) -> ApiResult<Json<Vec<ArchivedWorkoutSummary>>> {
-    let limit = params.limit.unwrap_or(50).min(500);
+    let limit = params.limit.unwrap_or(5000).min(5000);
     let offset = params.offset.unwrap_or(0);
     let year_prefix = params.year.map(|year| format!("{year:04}-%"));
 
@@ -189,8 +189,8 @@ async fn import_archived_workouts(
         let review_status = entry
             .review_status
             .unwrap_or_else(|| "needs_review".to_owned());
-        let raw_ocr_text = entry.raw_ocr_text.unwrap_or_default();
-        let corrected_text = entry.corrected_text.unwrap_or_default();
+        let raw_ocr_text = entry.raw_ocr_text.clone().unwrap_or_default();
+        let corrected_text = entry.corrected_text.clone().unwrap_or_default();
         let ready_for_retrieval = entry.ready_for_retrieval.unwrap_or(false);
         let exclude_from_stats = entry.exclude_from_stats.unwrap_or(true);
 
@@ -198,15 +198,22 @@ async fn import_archived_workouts(
             "SELECT 1
              FROM archived_workouts
              WHERE user_id = ?
-               AND archive_date = ?
-               AND title = ?
-               AND COALESCE(source_file, '') = COALESCE(?, '')
+               AND (
+                    (COALESCE(?, '') <> '' AND COALESCE(source_file, '') = COALESCE(?, ''))
+                    OR (
+                        title = ?
+                        AND COALESCE(NULLIF(corrected_text, ''), raw_ocr_text, '') =
+                            COALESCE(NULLIF(?, ''), ?, '')
+                    )
+               )
              LIMIT 1",
         )
         .bind(&claims.sub)
-        .bind(&entry.archive_date)
-        .bind(entry.title.trim())
         .bind(entry.source_file.as_deref())
+        .bind(entry.source_file.as_deref())
+        .bind(entry.title.trim())
+        .bind(entry.corrected_text.as_deref())
+        .bind(entry.raw_ocr_text.as_deref())
         .fetch_optional(&mut *tx)
         .await
         .map_err(AppError::from)?

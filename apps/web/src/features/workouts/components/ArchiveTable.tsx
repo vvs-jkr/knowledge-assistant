@@ -22,7 +22,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const PAGE_SIZE = 15
 const columnHelper = createColumnHelper<ArchivedWorkoutSummary>()
@@ -72,6 +72,10 @@ export function ArchiveTable() {
 
   const { data: items, isLoading } = useArchivedWorkouts(queryParams)
 
+  useEffect(() => {
+    setPage(0)
+  }, [filters.review_status, filters.year])
+
   const table = useReactTable({
     data: items ?? [],
     columns,
@@ -104,7 +108,8 @@ export function ArchiveTable() {
 
   const allRows = table.getRowModel().rows
   const totalPages = Math.ceil(allRows.length / PAGE_SIZE)
-  const pageRows = allRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const safePage = Math.min(page, Math.max(totalPages - 1, 0))
+  const pageRows = allRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
 
   return (
     <div className="flex flex-col overflow-hidden">
@@ -182,7 +187,7 @@ export function ArchiveTable() {
       {totalPages > 1 && (
         <div className="flex shrink-0 items-center justify-between border-t px-4 py-2 text-sm text-muted-foreground">
           <span>
-            {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, allRows.length)} из{' '}
+            {safePage * PAGE_SIZE + 1}-{Math.min((safePage + 1) * PAGE_SIZE, allRows.length)} из{' '}
             {allRows.length}
           </span>
           <div className="flex items-center gap-1">
@@ -191,19 +196,19 @@ export function ArchiveTable() {
               size="icon"
               className="h-7 w-7"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
+              disabled={safePage === 0}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span>
-              {page + 1} / {totalPages}
+              {safePage + 1} / {totalPages}
             </span>
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page === totalPages - 1}
+              disabled={safePage === totalPages - 1}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

@@ -320,6 +320,44 @@ async fn import_archived_workouts_creates_multiple_entries_and_skips_duplicates(
 }
 
 #[tokio::test]
+async fn import_archived_workouts_keeps_same_date_and_title_when_content_differs() {
+    let server = make_server().await;
+    let token = register_and_get_token(&server, "archive_import_content@example.com").await;
+    let (name, val) = bearer(&token);
+
+    let resp = server
+        .post("/archive/workouts/import")
+        .add_header(name.clone(), val.clone())
+        .json(&json!({
+            "entries": [
+                {
+                    "archive_date": "2022-08-01",
+                    "title": "Charge",
+                    "raw_ocr_text": "Charge 10 rounds for time"
+                },
+                {
+                    "archive_date": "2022-08-01",
+                    "title": "Charge",
+                    "raw_ocr_text": "Charge AMRAP in 20 min"
+                }
+            ]
+        }))
+        .await;
+
+    resp.assert_status(StatusCode::OK);
+    let body = resp.json::<Value>();
+    assert_eq!(body["imported"].as_u64().expect("imported"), 2);
+    assert_eq!(body["skipped"].as_u64().expect("skipped"), 0);
+
+    let list = server
+        .get("/archive/workouts")
+        .add_header(name, val)
+        .await;
+    list.assert_status_ok();
+    assert_eq!(list.json::<Value>().as_array().expect("items").len(), 2);
+}
+
+#[tokio::test]
 async fn user_cannot_access_other_users_archived_workout() {
     let server = make_server().await;
     let token_a = register_and_get_token(&server, "archive_iso_a@example.com").await;
