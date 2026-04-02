@@ -108,6 +108,33 @@ pub struct UpdateArchivedWorkoutRequest {
     pub images: Option<Vec<ArchivedWorkoutImageInput>>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ImportArchivedWorkoutItem {
+    pub archive_date: String,
+    pub title: String,
+    pub source_system: Option<String>,
+    pub source_type: Option<String>,
+    pub source_file: Option<String>,
+    pub raw_ocr_text: Option<String>,
+    pub corrected_text: Option<String>,
+    pub review_status: Option<String>,
+    pub quality_score: Option<f64>,
+    pub exclude_from_stats: Option<bool>,
+    pub sections: Option<Vec<ArchivedWorkoutSectionInput>>,
+    pub images: Option<Vec<ArchivedWorkoutImageInput>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ImportArchivedWorkoutsRequest {
+    pub entries: Vec<ImportArchivedWorkoutItem>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ImportArchivedWorkoutsResponse {
+    pub imported: usize,
+    pub skipped: usize,
+}
+
 #[derive(Debug, Deserialize, Default)]
 pub struct ArchivedWorkoutsQuery {
     pub review_status: Option<String>,
@@ -145,6 +172,17 @@ pub fn validate_archive_update(body: &UpdateArchivedWorkoutRequest) -> ApiResult
         if title.trim().is_empty() {
             return Err(AppError::BadRequest("title cannot be empty".into()));
         }
+    }
+    if let Some(status) = body.review_status.as_deref() {
+        validate_archive_review_status(status)?;
+    }
+    Ok(())
+}
+
+pub fn validate_archive_import_item(body: &ImportArchivedWorkoutItem) -> ApiResult<()> {
+    validate_date(&body.archive_date)?;
+    if body.title.trim().is_empty() {
+        return Err(AppError::BadRequest("title is required".into()));
     }
     if let Some(status) = body.review_status.as_deref() {
         validate_archive_review_status(status)?;

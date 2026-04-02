@@ -8,10 +8,11 @@ use sqlx::Row as _;
 
 use crate::{
     archive::{
-        validate_archive_create, validate_archive_update, ArchivedWorkoutDetail,
-        ArchivedWorkoutImage, ArchivedWorkoutImageInput, ArchivedWorkoutSection,
-        ArchivedWorkoutSectionInput, ArchivedWorkoutSummary, ArchivedWorkoutsQuery,
-        CreateArchivedWorkoutRequest, UpdateArchivedWorkoutRequest,
+        validate_archive_create, validate_archive_import_item, validate_archive_update,
+        ArchivedWorkoutDetail, ArchivedWorkoutImage, ArchivedWorkoutImageInput,
+        ArchivedWorkoutSection, ArchivedWorkoutSectionInput, ArchivedWorkoutSummary,
+        ArchivedWorkoutsQuery, CreateArchivedWorkoutRequest, ImportArchivedWorkoutsRequest,
+        ImportArchivedWorkoutsResponse, UpdateArchivedWorkoutRequest,
     },
     config::AppState,
     error::{ApiResult, AppError},
@@ -23,6 +24,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/archive/workouts",
             get(list_archived_workouts).post(create_archived_workout),
+        )
+        .route(
+            "/archive/workouts/import",
+            axum::routing::post(import_archived_workouts),
         )
         .route(
             "/archive/workouts/:id",
@@ -144,6 +149,103 @@ async fn create_archived_workout(
 
     let detail = fetch_archived_workout_detail(&state, &archive_id, &claims.sub).await?;
     Ok((StatusCode::CREATED, Json(detail)))
+}
+
+async fn import_archived_workouts(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<ImportArchivedWorkoutsRequest>,
+) -> ApiResult<Json<ImportArchivedWorkoutsResponse>> {
+    if body.entries.is_empty() {
+        return Err(AppError::BadRequest("entries are required".into()));
+    }
+
+    let mut imported = 0_usize;
+    let mut skipped = 0_usize;
+
+    for entry in &body.entries {
+        validate_archive_import_item(entry)?;
+    }
+
+    let mut tx = state.db.begin().await.map_err(AppError::from)?;
+
+    for entry in body.entries {
+        let source_system = entry
+            .source_system
+            .unwrap_or_else(|| "manual_import".to_owned());
+        let source_type = entry.source_type.unwrap_or_else(|| "digitized".to_owned());
+        let review_status = entry
+            .review_status
+            .unwrap_or_else(|| "needs_review".to_owned());
+        let raw_ocr_text = entry.raw_ocr_text.unwrap_or_default();
+        let corrected_text = entry.corrected_text.unwrap_or_default();
+        let exclude_from_stats = entry.exclude_from_stats.unwrap_or(true);
+
+        let duplicate_exists = sqlx::query(
+            "SELECT 1
+             FROM archived_workouts
+             WHERE user_id = ?
+               AND archive_date = ?
+               AND title = ?
+               AND COALESCE(source_file, '') = COALESCE(?, '')
+             LIMIT 1",
+        )
+        .bind(&claims.sub)
+        .bind(&entry.archive_date)
+        .bind(entry.title.trim())
+        .bind(entry.source_file.as_deref())
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(AppError::from)?
+        .is_some();
+
+        if duplicate_exists {
+            skipped += 1;
+            continue;
+        }
+
+        let archive_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+        sqlx::query(
+            r"INSERT INTO archived_workouts
+              (id, user_id, archive_date, title, source_system, source_type, source_file,
+               raw_ocr_text, corrected_text, review_status, quality_score, exclude_from_stats,
+               created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&archive_id)
+        .bind(&claims.sub)
+        .bind(&entry.archive_date)
+        .bind(entry.title.trim())
+        .bind(&source_system)
+        .bind(&source_type)
+        .bind(entry.source_file.as_deref())
+        .bind(&raw_ocr_text)
+        .bind(&corrected_text)
+        .bind(&review_status)
+        .bind(entry.quality_score)
+        .bind(if exclude_from_stats { 1_i64 } else { 0_i64 })
+        .bind(&now)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+        if let Some(sections) = &entry.sections {
+            replace_sections(&mut tx, &archive_id, sections).await?;
+        }
+
+        if let Some(images) = &entry.images {
+            replace_images(&mut tx, &archive_id, images).await?;
+        }
+
+        imported += 1;
+    }
+
+    tx.commit().await.map_err(AppError::from)?;
+
+    Ok(Json(ImportArchivedWorkoutsResponse { imported, skipped }))
 }
 
 async fn get_archived_workout(

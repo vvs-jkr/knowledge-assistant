@@ -193,6 +193,71 @@ async fn update_archived_workout_replaces_sections_and_marks_reviewed() {
 }
 
 #[tokio::test]
+async fn import_archived_workouts_creates_multiple_entries_and_skips_duplicates() {
+    let server = make_server().await;
+    let token = register_and_get_token(&server, "archive_import@example.com").await;
+    let (name, val) = bearer(&token);
+
+    let resp = server
+        .post("/archive/workouts/import")
+        .add_header(name.clone(), val.clone())
+        .json(&json!({
+            "entries": [
+                {
+                    "archive_date": "2022-08-01",
+                    "title": "Card A",
+                    "source_system": "digitizer",
+                    "source_file": "cards/a.jpg",
+                    "raw_ocr_text": "Charge\n3 rounds",
+                    "review_status": "needs_review"
+                },
+                {
+                    "archive_date": "2022-08-02",
+                    "title": "Card B",
+                    "source_system": "digitizer",
+                    "source_file": "cards/b.jpg",
+                    "raw_ocr_text": "Lifting\n5x5 squat",
+                    "review_status": "needs_review"
+                }
+            ]
+        }))
+        .await;
+
+    resp.assert_status(StatusCode::OK);
+    let body = resp.json::<Value>();
+    assert_eq!(body["imported"].as_u64().expect("imported"), 2);
+    assert_eq!(body["skipped"].as_u64().expect("skipped"), 0);
+
+    let list = server
+        .get("/archive/workouts")
+        .add_header(name.clone(), val.clone())
+        .await;
+    list.assert_status_ok();
+    assert_eq!(list.json::<Value>().as_array().expect("items").len(), 2);
+
+    let duplicate_resp = server
+        .post("/archive/workouts/import")
+        .add_header(name, val)
+        .json(&json!({
+            "entries": [
+                {
+                    "archive_date": "2022-08-01",
+                    "title": "Card A",
+                    "source_system": "digitizer",
+                    "source_file": "cards/a.jpg",
+                    "raw_ocr_text": "Duplicate"
+                }
+            ]
+        }))
+        .await;
+
+    duplicate_resp.assert_status(StatusCode::OK);
+    let duplicate_body = duplicate_resp.json::<Value>();
+    assert_eq!(duplicate_body["imported"].as_u64().expect("imported"), 0);
+    assert_eq!(duplicate_body["skipped"].as_u64().expect("skipped"), 1);
+}
+
+#[tokio::test]
 async fn user_cannot_access_other_users_archived_workout() {
     let server = make_server().await;
     let token_a = register_and_get_token(&server, "archive_iso_a@example.com").await;
