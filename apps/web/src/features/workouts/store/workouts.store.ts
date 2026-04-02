@@ -7,16 +7,26 @@ interface WorkoutsFilters {
   to: string | null
 }
 
+interface ArchiveFilters {
+  review_status: 'raw' | 'needs_review' | 'reviewed' | 'corrected' | null
+  year: string | null
+}
+
 interface WorkoutsState {
   selectedWorkoutId: string | null
-  activeTab: 'list' | 'cards' | 'stats' | 'plans'
+  selectedArchiveWorkoutId: string | null
+  activeTab: 'list' | 'cards' | 'stats' | 'plans' | 'archive'
   selectedPlanId: string | null
   filters: WorkoutsFilters
+  archiveFilters: ArchiveFilters
   selectWorkout: (id: string | null) => void
-  setActiveTab: (tab: 'list' | 'cards' | 'stats' | 'plans') => void
+  selectArchiveWorkout: (id: string | null) => void
+  setActiveTab: (tab: 'list' | 'cards' | 'stats' | 'plans' | 'archive') => void
   selectPlan: (id: string | null) => void
   setFilter: (key: keyof WorkoutsFilters, value: string | null) => void
+  setArchiveFilter: (key: keyof ArchiveFilters, value: string | null) => void
   resetFilters: () => void
+  resetArchiveFilters: () => void
 }
 
 const defaultFilters: WorkoutsFilters = {
@@ -25,12 +35,20 @@ const defaultFilters: WorkoutsFilters = {
   to: null,
 }
 
+const defaultArchiveFilters: ArchiveFilters = {
+  review_status: null,
+  year: null,
+}
+
 export const useWorkoutsStore = create<WorkoutsState>((set) => ({
   selectedWorkoutId: null,
+  selectedArchiveWorkoutId: null,
   activeTab: 'cards',
   selectedPlanId: null,
   filters: { ...defaultFilters },
+  archiveFilters: { ...defaultArchiveFilters },
   selectWorkout: (id) => set({ selectedWorkoutId: id }),
+  selectArchiveWorkout: (id) => set({ selectedArchiveWorkoutId: id }),
   setActiveTab: (tab) => set({ activeTab: tab }),
   selectPlan: (id) => set({ selectedPlanId: id }),
   setFilter: (key, value) =>
@@ -40,5 +58,13 @@ export const useWorkoutsStore = create<WorkoutsState>((set) => ({
         [key]: value,
       },
     })),
+  setArchiveFilter: (key, value) =>
+    set((state) => ({
+      archiveFilters: {
+        ...state.archiveFilters,
+        [key]: value,
+      },
+    })),
   resetFilters: () => set({ filters: { ...defaultFilters } }),
+  resetArchiveFilters: () => set({ archiveFilters: { ...defaultArchiveFilters } }),
 }))

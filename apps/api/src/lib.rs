@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod archive;
 pub mod auth;
 pub mod chat;
 pub mod config;
@@ -21,6 +22,7 @@ pub fn build_app(state: config::AppState) -> Router {
     Router::new()
         .route("/health", get(|| async { "OK" }))
         .merge(routes::auth::router(state.rate_limit_enabled))
+        .merge(routes::archive::router())
         .merge(routes::notes::router())
         .merge(routes::health::router())
         .merge(routes::workouts::router())

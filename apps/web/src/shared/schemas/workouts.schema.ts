@@ -14,6 +14,7 @@ export const workoutTypeSchema = z.enum([
 
 // source_type values must match backend VALID_SOURCE_TYPES
 export const sourceTypeSchema = z.enum(['manual', 'digitized', 'generated'])
+export const archiveReviewStatusSchema = z.enum(['raw', 'needs_review', 'reviewed', 'corrected'])
 
 export const workoutSummarySchema = z.object({
   id: z.string(),
@@ -132,7 +133,49 @@ export const workoutAnalysisSchema = z.object({
   suggested_focus: z.string(),
 })
 
+export const archivedWorkoutSummarySchema = z.object({
+  id: z.string(),
+  archive_date: z.string(),
+  title: z.string(),
+  source_system: z.string(),
+  source_type: z.string(),
+  review_status: archiveReviewStatusSchema,
+  quality_score: z.number().nullable(),
+  section_count: z.number(),
+  image_count: z.number(),
+  created_at: z.string(),
+  updated_at: z.string(),
+})
+
+export const archivedWorkoutSectionSchema = z.object({
+  id: z.string(),
+  section_type_raw: z.string().nullable(),
+  section_type_normalized: z.string().nullable(),
+  title: z.string().nullable(),
+  content_raw: z.string(),
+  content_corrected: z.string(),
+  order_index: z.number(),
+})
+
+export const archivedWorkoutImageSchema = z.object({
+  id: z.string(),
+  file_path: z.string(),
+  sort_order: z.number(),
+})
+
+export const archivedWorkoutDetailSchema = archivedWorkoutSummarySchema
+  .omit({ section_count: true, image_count: true })
+  .extend({
+    source_file: z.string().nullable(),
+    raw_ocr_text: z.string(),
+    corrected_text: z.string(),
+    exclude_from_stats: z.boolean(),
+    sections: z.array(archivedWorkoutSectionSchema),
+    images: z.array(archivedWorkoutImageSchema),
+  })
+
 export type WorkoutAnalysis = z.infer<typeof workoutAnalysisSchema>
+export type ArchiveReviewStatus = z.infer<typeof archiveReviewStatusSchema>
 export type WorkoutType = z.infer<typeof workoutTypeSchema>
 export type WorkoutSummary = z.infer<typeof workoutSummarySchema>
 export type WorkoutDetail = z.infer<typeof workoutDetailSchema>
@@ -147,3 +190,7 @@ export type WorkoutStats = z.infer<typeof workoutStatsSchema>
 export type CreateWorkoutLog = z.infer<typeof createWorkoutLogSchema>
 export type WorkoutPlanSummary = z.infer<typeof workoutPlanSummarySchema>
 export type WorkoutPlanDetail = z.infer<typeof workoutPlanDetailSchema>
+export type ArchivedWorkoutSummary = z.infer<typeof archivedWorkoutSummarySchema>
+export type ArchivedWorkoutDetail = z.infer<typeof archivedWorkoutDetailSchema>
+export type ArchivedWorkoutSection = z.infer<typeof archivedWorkoutSectionSchema>
+export type ArchivedWorkoutImage = z.infer<typeof archivedWorkoutImageSchema>

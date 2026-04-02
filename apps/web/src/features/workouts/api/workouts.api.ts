@@ -1,5 +1,8 @@
 import { api } from '@/shared/lib/api'
 import type {
+  ArchivedWorkoutDetail,
+  ArchivedWorkoutSummary,
+  ArchiveReviewStatus,
   CreateWorkoutLog,
   ExerciseInfo,
   WorkoutAnalysis,
@@ -12,6 +15,8 @@ import type {
   WorkoutType,
 } from '@/shared/schemas/workouts.schema'
 import {
+  archivedWorkoutDetailSchema,
+  archivedWorkoutSummarySchema,
   exerciseInfoSchema,
   workoutAnalysisSchema,
   workoutDetailSchema,
@@ -106,6 +111,42 @@ type LogsQuery = {
   offset?: number
 }
 
+type ArchivedWorkoutSectionInput = {
+  section_type_raw?: string | null
+  section_type_normalized?: string | null
+  title?: string | null
+  content_raw?: string | null
+  content_corrected?: string | null
+  order_index?: number
+}
+
+type ArchivedWorkoutImageInput = {
+  file_path: string
+  sort_order?: number
+}
+
+type ArchivedWorkoutsQuery = {
+  review_status?: ArchiveReviewStatus
+  year?: number
+  limit?: number
+  offset?: number
+}
+
+type UpdateArchivedWorkoutInput = {
+  archive_date?: string
+  title?: string
+  source_system?: string
+  source_type?: string
+  source_file?: string | null
+  raw_ocr_text?: string
+  corrected_text?: string
+  review_status?: ArchiveReviewStatus
+  quality_score?: number | null
+  exclude_from_stats?: boolean
+  sections?: ArchivedWorkoutSectionInput[]
+  images?: ArchivedWorkoutImageInput[]
+}
+
 const workoutsApi = {
   list: (params?: WorkoutsQuery): Promise<WorkoutSummary[]> =>
     api.get<WorkoutSummary[]>('/workouts', { params }).then((r) => {
@@ -177,6 +218,23 @@ const workoutsApi = {
 
     delete: (id: string): Promise<void> =>
       api.delete(`/workouts/plans/${id}`).then(() => undefined),
+  },
+
+  archive: {
+    list: (params?: ArchivedWorkoutsQuery): Promise<ArchivedWorkoutSummary[]> =>
+      api.get<ArchivedWorkoutSummary[]>('/archive/workouts', { params }).then((r) => {
+        return archivedWorkoutSummarySchema.array().parse(r.data)
+      }),
+
+    get: (id: string): Promise<ArchivedWorkoutDetail> =>
+      api.get<ArchivedWorkoutDetail>(`/archive/workouts/${id}`).then((r) => {
+        return archivedWorkoutDetailSchema.parse(r.data)
+      }),
+
+    update: (id: string, body: UpdateArchivedWorkoutInput): Promise<ArchivedWorkoutDetail> =>
+      api.put<ArchivedWorkoutDetail>(`/archive/workouts/${id}`, body).then((r) => {
+        return archivedWorkoutDetailSchema.parse(r.data)
+      }),
   },
 }
 
@@ -324,5 +382,41 @@ export function useDeletePlan() {
   })
 }
 
+export function useArchivedWorkouts(params?: ArchivedWorkoutsQuery) {
+  return useQuery({
+    queryKey: ['archive', 'workouts', 'list', params],
+    queryFn: () => workoutsApi.archive.list(params),
+    staleTime: 30_000,
+  })
+}
+
+export function useArchivedWorkout(id: string | null) {
+  return useQuery({
+    queryKey: ['archive', 'workouts', 'detail', id],
+    queryFn: () => workoutsApi.archive.get(id as string),
+    enabled: id !== null,
+    staleTime: 30_000,
+  })
+}
+
+export function useUpdateArchivedWorkout() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & UpdateArchivedWorkoutInput) =>
+      workoutsApi.archive.update(id, body),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['archive', 'workouts', 'list'] })
+      qc.setQueryData(['archive', 'workouts', 'detail', updated.id], updated)
+    },
+  })
+}
+
 export { workoutsApi }
-export type { CreateWorkoutInput, WorkoutsQuery, WorkoutType, WorkoutAnalysis }
+export type {
+  ArchivedWorkoutsQuery,
+  CreateWorkoutInput,
+  UpdateArchivedWorkoutInput,
+  WorkoutAnalysis,
+  WorkoutsQuery,
+  WorkoutType,
+}

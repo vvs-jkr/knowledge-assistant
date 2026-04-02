@@ -1,3 +1,4 @@
+import { ArchivePanel } from '@/features/workouts/components/ArchivePanel'
 import { CreateWorkoutDialog } from '@/features/workouts/components/CreateWorkoutDialog'
 import { GenerateWorkoutDialog } from '@/features/workouts/components/GenerateWorkoutDialog'
 import { PlanDetailView } from '@/features/workouts/components/PlanDetailView'
@@ -15,13 +16,14 @@ export function WorkoutsMainPanel() {
   const setActiveTab = useWorkoutsStore((s) => s.setActiveTab)
   const selectedWorkoutId = useWorkoutsStore((s) => s.selectedWorkoutId)
   const selectedPlanId = useWorkoutsStore((s) => s.selectedPlanId)
+  const isArchiveTab = activeTab === 'archive'
 
   return (
     <div className="flex h-full w-full flex-col">
       {/* Tab bar */}
       <div className="flex shrink-0 items-center justify-between border-b pr-4">
         <div className="flex">
-          {(['cards', 'plans', 'stats', 'list'] as const).map((tab) => (
+          {(['cards', 'plans', 'stats', 'list', 'archive'] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -36,17 +38,21 @@ export function WorkoutsMainPanel() {
                 ? 'Таблица'
                 : tab === 'cards'
                   ? 'Карточки'
+                  : tab === 'archive'
+                    ? 'Архив'
                   : tab === 'stats'
                     ? 'Статистика'
                     : 'Планы'}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <CreateWorkoutDialog />
-          <GenerateWorkoutDialog />
-          <WorkoutAnalysisDialog />
-        </div>
+        {!isArchiveTab && (
+          <div className="flex items-center gap-2">
+            <CreateWorkoutDialog />
+            <GenerateWorkoutDialog />
+            <WorkoutAnalysisDialog />
+          </div>
+        )}
       </div>
 
       {/* Tab content */}
@@ -88,6 +94,8 @@ export function WorkoutsMainPanel() {
           {selectedPlanId !== null ? <PlanDetailView planId={selectedPlanId} /> : <PlansTab />}
         </div>
       )}
+
+      {activeTab === 'archive' && <ArchivePanel />}
     </div>
   )
 }
