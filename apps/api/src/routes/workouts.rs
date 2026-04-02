@@ -1754,7 +1754,9 @@ async fn build_rag_context(
         }
 
         let row = sqlx::query(
-            "SELECT title, content_enc, nonce FROM knowledge_base WHERE id = ? AND user_id = ?",
+            "SELECT title, doc_type, source, content_enc, nonce
+             FROM knowledge_base
+             WHERE id = ? AND user_id = ? AND use_for_generation = 1",
         )
         .bind(&knowledge_id)
         .bind(user_id)
@@ -1767,11 +1769,18 @@ async fn build_rag_context(
         let content_enc: Vec<u8> = row.try_get("content_enc").map_err(AppError::from)?;
         let nonce: Vec<u8> = row.try_get("nonce").map_err(AppError::from)?;
         let title: String = row.try_get("title").map_err(AppError::from)?;
+        let doc_type: String = row.try_get("doc_type").map_err(AppError::from)?;
+        let source: String = row.try_get("source").map_err(AppError::from)?;
 
         if let Ok(bytes) = crypto::decrypt(&state.encryption_key, &content_enc, &nonce) {
             let text = String::from_utf8_lossy(&bytes);
             let preview: String = text.chars().take(400).collect();
-            context_lines.push(format!("## {title}\n{preview}"));
+            let source_line = if source.trim().is_empty() {
+                String::new()
+            } else {
+                format!(" | source: {source}")
+            };
+            context_lines.push(format!("## {title} [{doc_type}]{source_line}\n{preview}"));
             used_ids.push(knowledge_id);
         }
     }

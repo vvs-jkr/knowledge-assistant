@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     routing::get,
     Json, Router,
@@ -10,7 +10,10 @@ use crate::{
     config::AppState,
     crypto, embeddings,
     error::{ApiResult, AppError},
-    knowledge::{KnowledgeEntry, KnowledgeEntryWithContent},
+    knowledge::{
+        validate_knowledge_doc_type, validate_knowledge_review_status, CreateKnowledgeRequest,
+        KnowledgeEntry, KnowledgeEntryWithContent, KnowledgeListQuery,
+    },
     middleware::AuthUser,
 };
 
@@ -19,7 +22,7 @@ const MAX_FILE_SIZE: usize = 10 * 1024 * 1024;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/knowledge", get(list_knowledge))
+        .route("/knowledge", get(list_knowledge).post(create_knowledge))
         .route("/knowledge/upload", post_upload())
         .route(
             "/knowledge/:id",
@@ -89,16 +92,24 @@ async fn upload_knowledge(
         let entry_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
         let user_id = &claims.sub;
         let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let tags_json = "[]";
+        let metadata_json = "{}";
 
         sqlx::query(
             r"INSERT INTO knowledge_base
-               (id, user_id, title, source, content_enc, nonce, size_bytes, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+               (id, user_id, title, source, doc_type, tags_json, review_status, use_for_generation,
+                metadata_json, content_enc, nonce, size_bytes, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&entry_id)
         .bind(user_id)
         .bind(&title)
         .bind("")
+        .bind("general")
+        .bind(tags_json)
+        .bind("reviewed")
+        .bind(1_i64)
+        .bind(metadata_json)
         .bind(&ciphertext)
         .bind(&nonce)
         .bind(size_bytes)
@@ -115,6 +126,11 @@ async fn upload_knowledge(
             id: entry_id,
             title,
             source: String::new(),
+            doc_type: "general".to_owned(),
+            tags: Vec::new(),
+            review_status: "reviewed".to_owned(),
+            use_for_generation: true,
+            metadata: serde_json::json!({}),
             size_bytes,
             created_at: now.clone(),
             updated_at: now,
@@ -131,20 +147,117 @@ async fn upload_knowledge(
 }
 
 // ---------------------------------------------------------------------------
+// POST /knowledge
+// ---------------------------------------------------------------------------
+
+async fn create_knowledge(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Json(body): Json<CreateKnowledgeRequest>,
+) -> ApiResult<(StatusCode, Json<KnowledgeEntryWithContent>)> {
+    if body.title.trim().is_empty() {
+        return Err(AppError::BadRequest("title is required".into()));
+    }
+    if body.content.trim().is_empty() {
+        return Err(AppError::BadRequest("content is required".into()));
+    }
+
+    let doc_type = body.doc_type.as_deref().unwrap_or("general");
+    validate_knowledge_doc_type(doc_type)?;
+
+    let review_status = body.review_status.as_deref().unwrap_or("reviewed");
+    validate_knowledge_review_status(review_status)?;
+
+    let source = body.source.unwrap_or_default();
+    let tags = body.tags.unwrap_or_default();
+    let metadata = body.metadata.unwrap_or_else(|| serde_json::json!({}));
+    let tags_json = serde_json::to_string(&tags)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize tags: {e}")))?;
+    let metadata_json = serde_json::to_string(&metadata)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("serialize metadata: {e}")))?;
+    let content_bytes = body.content.into_bytes();
+    let size_bytes = i64::try_from(content_bytes.len())
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("size overflow: {e}")))?;
+    let (ciphertext, nonce) = crypto::encrypt(&state.encryption_key, &content_bytes)?;
+
+    let entry_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let use_for_generation = body.use_for_generation.unwrap_or(true);
+
+    sqlx::query(
+        r"INSERT INTO knowledge_base
+           (id, user_id, title, source, doc_type, tags_json, review_status, use_for_generation,
+            metadata_json, content_enc, nonce, size_bytes, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&entry_id)
+    .bind(&claims.sub)
+    .bind(body.title.trim())
+    .bind(&source)
+    .bind(doc_type)
+    .bind(&tags_json)
+    .bind(review_status)
+    .bind(if use_for_generation { 1_i64 } else { 0_i64 })
+    .bind(&metadata_json)
+    .bind(&ciphertext)
+    .bind(&nonce)
+    .bind(size_bytes)
+    .bind(&now)
+    .bind(&now)
+    .execute(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let content = String::from_utf8(content_bytes)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("utf8 decode: {e}")))?;
+    spawn_knowledge_embedding(&state, entry_id.clone(), content.clone());
+
+    Ok((
+        StatusCode::CREATED,
+        Json(KnowledgeEntryWithContent {
+            id: entry_id,
+            title: body.title.trim().to_owned(),
+            source,
+            doc_type: doc_type.to_owned(),
+            tags,
+            review_status: review_status.to_owned(),
+            use_for_generation,
+            metadata,
+            content,
+            size_bytes,
+            created_at: now.clone(),
+            updated_at: now,
+        }),
+    ))
+}
+
+// ---------------------------------------------------------------------------
 // GET /knowledge
 // ---------------------------------------------------------------------------
 
 async fn list_knowledge(
     AuthUser(claims): AuthUser,
     State(state): State<AppState>,
+    Query(params): Query<KnowledgeListQuery>,
 ) -> ApiResult<Json<Vec<KnowledgeEntry>>> {
+    if let Some(doc_type) = params.doc_type.as_deref() {
+        validate_knowledge_doc_type(doc_type)?;
+    }
+
     let rows = sqlx::query(
-        r"SELECT id, title, source, size_bytes, created_at, updated_at
+        r"SELECT id, title, source, doc_type, tags_json, review_status, use_for_generation,
+                  metadata_json, size_bytes, created_at, updated_at
            FROM knowledge_base
            WHERE user_id = ?
+             AND (? IS NULL OR doc_type = ?)
+             AND (? IS NULL OR use_for_generation = ?)
            ORDER BY updated_at DESC",
     )
     .bind(&claims.sub)
+    .bind(params.doc_type.as_deref())
+    .bind(params.doc_type.as_deref())
+    .bind(params.use_for_generation)
+    .bind(params.use_for_generation.map(i64::from))
     .fetch_all(&state.db)
     .await
     .map_err(AppError::from)?;
@@ -152,10 +265,22 @@ async fn list_knowledge(
     let entries = rows
         .into_iter()
         .map(|r| -> ApiResult<KnowledgeEntry> {
+            let tags_json: String = r.try_get("tags_json").map_err(AppError::from)?;
+            let metadata_json: String = r.try_get("metadata_json").map_err(AppError::from)?;
             Ok(KnowledgeEntry {
                 id: r.try_get("id").map_err(AppError::from)?,
                 title: r.try_get("title").map_err(AppError::from)?,
                 source: r.try_get("source").map_err(AppError::from)?,
+                doc_type: r.try_get("doc_type").map_err(AppError::from)?,
+                tags: serde_json::from_str(&tags_json)
+                    .map_err(|e| AppError::Internal(anyhow::anyhow!("parse tags_json: {e}")))?,
+                review_status: r.try_get("review_status").map_err(AppError::from)?,
+                use_for_generation: r
+                    .try_get::<i64, _>("use_for_generation")
+                    .map_err(AppError::from)?
+                    != 0,
+                metadata: serde_json::from_str(&metadata_json)
+                    .map_err(|e| AppError::Internal(anyhow::anyhow!("parse metadata_json: {e}")))?,
                 size_bytes: r.try_get("size_bytes").map_err(AppError::from)?,
                 created_at: r.try_get("created_at").map_err(AppError::from)?,
                 updated_at: r.try_get("updated_at").map_err(AppError::from)?,
@@ -176,7 +301,8 @@ async fn get_knowledge(
     Path(id): Path<String>,
 ) -> ApiResult<Json<KnowledgeEntryWithContent>> {
     let row = sqlx::query(
-        r"SELECT id, title, source, content_enc, nonce, size_bytes, created_at, updated_at
+        r"SELECT id, title, source, doc_type, tags_json, review_status, use_for_generation,
+                  metadata_json, content_enc, nonce, size_bytes, created_at, updated_at
            FROM knowledge_base
            WHERE id = ? AND user_id = ?",
     )
@@ -189,6 +315,8 @@ async fn get_knowledge(
 
     let content_enc: Vec<u8> = row.try_get("content_enc").map_err(AppError::from)?;
     let nonce: Vec<u8> = row.try_get("nonce").map_err(AppError::from)?;
+    let tags_json: String = row.try_get("tags_json").map_err(AppError::from)?;
+    let metadata_json: String = row.try_get("metadata_json").map_err(AppError::from)?;
     let plaintext = crypto::decrypt(&state.encryption_key, &content_enc, &nonce)?;
     let content = String::from_utf8(plaintext)
         .map_err(|e| AppError::Internal(anyhow::anyhow!("utf8 decode: {e}")))?;
@@ -197,6 +325,16 @@ async fn get_knowledge(
         id: row.try_get("id").map_err(AppError::from)?,
         title: row.try_get("title").map_err(AppError::from)?,
         source: row.try_get("source").map_err(AppError::from)?,
+        doc_type: row.try_get("doc_type").map_err(AppError::from)?,
+        tags: serde_json::from_str(&tags_json)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("parse tags_json: {e}")))?,
+        review_status: row.try_get("review_status").map_err(AppError::from)?,
+        use_for_generation: row
+            .try_get::<i64, _>("use_for_generation")
+            .map_err(AppError::from)?
+            != 0,
+        metadata: serde_json::from_str(&metadata_json)
+            .map_err(|e| AppError::Internal(anyhow::anyhow!("parse metadata_json: {e}")))?,
         content,
         size_bytes: row.try_get("size_bytes").map_err(AppError::from)?,
         created_at: row.try_get("created_at").map_err(AppError::from)?,

@@ -1,3 +1,4 @@
+import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,16 @@ import { cn } from '@/lib/utils'
 import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
+const DOC_TYPE_LABELS: Record<string, string> = {
+  general: 'Общее',
+  archive_workout: 'Архив',
+  book_excerpt: 'Книга',
+  programming_principle: 'Принцип',
+  exercise_note: 'Упражнение',
+  coach_note: 'Тренер',
+  user_preference: 'Предпочтение',
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -25,10 +36,20 @@ function formatBytes(bytes: number): string {
 }
 
 export function KnowledgeList() {
-  const { data: entries, isLoading } = useKnowledgeList()
   const selectedEntryId = useKnowledgeStore((s) => s.selectedEntryId)
+  const docTypeFilter = useKnowledgeStore((s) => s.docTypeFilter)
   const selectEntry = useKnowledgeStore((s) => s.selectEntry)
+  const setDocTypeFilter = useKnowledgeStore((s) => s.setDocTypeFilter)
   const deleteEntry = useDeleteKnowledge()
+  const { data: entries, isLoading } = useKnowledgeList({ doc_type: docTypeFilter })
+
+  const filterOptions = [
+    { value: 'all', label: 'Все' },
+    { value: 'book_excerpt', label: 'Книги' },
+    { value: 'programming_principle', label: 'Принципы' },
+    { value: 'exercise_note', label: 'Упражнения' },
+    { value: 'user_preference', label: 'Предпочтения' },
+  ] as const
 
   if (isLoading) {
     return (
@@ -51,7 +72,20 @@ export function KnowledgeList() {
 
   return (
     <ScrollArea className="flex-1">
-      <div className="space-y-0.5 p-2">
+      <div className="space-y-2 p-2">
+        <div className="flex flex-wrap gap-1 px-1">
+          {filterOptions.map((option) => (
+            <Button
+              key={option.value}
+              variant={docTypeFilter === option.value ? 'default' : 'outline'}
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setDocTypeFilter(option.value)}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
         {entries.map((entry) => (
           <div
             key={entry.id}
@@ -68,8 +102,19 @@ export function KnowledgeList() {
               onClick={() => selectEntry(entry.id)}
             >
               <p className="truncate font-medium">{entry.title}</p>
-              <p className="truncate text-xs text-muted-foreground">
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                <Badge variant="secondary" className="text-[10px]">
+                  {DOC_TYPE_LABELS[entry.doc_type] ?? entry.doc_type}
+                </Badge>
+                {!entry.use_for_generation ? (
+                  <Badge variant="outline" className="text-[10px]">
+                    Только справочно
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="truncate pt-1 text-xs text-muted-foreground">
                 {formatBytes(entry.size_bytes)}
+                {entry.tags.length > 0 ? ` • ${entry.tags.join(', ')}` : ''}
               </p>
             </button>
             <div className="shrink-0 pr-1">
