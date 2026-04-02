@@ -797,6 +797,57 @@ async fn get_stats_type_distribution_reflects_created_workouts() {
     assert_eq!(amrap["count"].as_i64().expect("count"), 2);
 }
 
+#[tokio::test]
+async fn archived_workouts_do_not_affect_active_workout_stats() {
+    let server = make_server().await;
+    let token = register_and_get_token(&server, "wk_stats_archive@example.com").await;
+    let (name, val) = bearer(&token);
+
+    server
+        .post("/workouts")
+        .add_header(
+            axum::http::header::AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {token}")).expect("header"),
+        )
+        .json(&json!({
+            "date": "2026-02-10",
+            "name": "Active Workout",
+            "workout_type": "lifting"
+        }))
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    server
+        .post("/archive/workouts")
+        .add_header(
+            axum::http::header::AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {token}")).expect("header"),
+        )
+        .json(&json!({
+            "archive_date": "2022-05-10",
+            "title": "Archived Card",
+            "source_system": "btwb",
+            "source_type": "digitized",
+            "raw_ocr_text": "Old OCR card",
+            "corrected_text": "Old corrected card",
+            "review_status": "reviewed",
+            "exclude_from_stats": true
+        }))
+        .await
+        .assert_status(StatusCode::CREATED);
+
+    let res = server
+        .get("/workouts/stats")
+        .add_query_params(&[("from", "2022-01-01"), ("to", "2026-12-31")])
+        .add_header(name, val)
+        .await;
+
+    res.assert_status_ok();
+    let body = res.json::<Value>();
+    assert_eq!(body["total_workouts"].as_i64().expect("total_workouts"), 1);
+    assert_eq!(body["heatmap"].as_array().expect("heatmap").len(), 1);
+}
+
 // ---------------------------------------------------------------------------
 // Logs
 // ---------------------------------------------------------------------------
