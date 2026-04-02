@@ -166,10 +166,17 @@ type UpdateArchivedWorkoutInput = {
   raw_ocr_text?: string
   corrected_text?: string
   review_status?: ArchiveReviewStatus
+  ready_for_retrieval?: boolean
   quality_score?: number | null
   exclude_from_stats?: boolean
   sections?: ArchivedWorkoutSectionInput[]
   images?: ArchivedWorkoutImageInput[]
+}
+
+type BatchReviewArchivedWorkoutInput = {
+  ids: string[]
+  review_status?: ArchiveReviewStatus
+  ready_for_retrieval?: boolean
 }
 
 const workoutsApi = {
@@ -260,6 +267,9 @@ const workoutsApi = {
       api.put<ArchivedWorkoutDetail>(`/archive/workouts/${id}`, body).then((r) => {
         return archivedWorkoutDetailSchema.parse(r.data)
       }),
+
+    batchReview: (body: BatchReviewArchivedWorkoutInput): Promise<{ updated: number }> =>
+      api.post<{ updated: number }>('/archive/workouts/batch-review', body).then((r) => r.data),
   },
 }
 
@@ -432,6 +442,17 @@ export function useUpdateArchivedWorkout() {
     onSuccess: (updated) => {
       qc.invalidateQueries({ queryKey: ['archive', 'workouts', 'list'] })
       qc.setQueryData(['archive', 'workouts', 'detail', updated.id], updated)
+    },
+  })
+}
+
+export function useBatchReviewArchivedWorkouts() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: BatchReviewArchivedWorkoutInput) => workoutsApi.archive.batchReview(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['archive', 'workouts', 'list'] })
+      qc.invalidateQueries({ queryKey: ['archive', 'workouts', 'detail'] })
     },
   })
 }

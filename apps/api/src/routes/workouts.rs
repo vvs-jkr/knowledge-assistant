@@ -1569,6 +1569,7 @@ async fn build_archive_context(
                 aw.corrected_text, aw.raw_ocr_text
          FROM archived_workouts aw
          WHERE aw.user_id = ?
+           AND aw.ready_for_retrieval = 1
            AND aw.review_status IN ('reviewed', 'corrected')
          ORDER BY aw.archive_date DESC, aw.updated_at DESC
          LIMIT 200",

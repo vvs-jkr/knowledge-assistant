@@ -58,7 +58,10 @@ const columns = [
 export function ArchiveTable() {
   const filters = useWorkoutsStore((s) => s.archiveFilters)
   const selectedArchiveWorkoutId = useWorkoutsStore((s) => s.selectedArchiveWorkoutId)
+  const selectedArchiveWorkoutIds =
+    useWorkoutsStore((s) => s.selectedArchiveWorkoutIds) ?? []
   const selectArchiveWorkout = useWorkoutsStore((s) => s.selectArchiveWorkout)
+  const toggleArchiveWorkoutSelection = useWorkoutsStore((s) => s.toggleArchiveWorkoutSelection)
   const [sorting, setSorting] = useState<SortingState>([])
   const [page, setPage] = useState(0)
 
@@ -110,6 +113,7 @@ export function ArchiveTable() {
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
+                <TableHead className="w-10" />
                 {hg.headers.map((header) => (
                   <TableHead key={header.id}>
                     {header.isPlaceholder ? null : (
@@ -145,9 +149,27 @@ export function ArchiveTable() {
                   )}
                   onClick={() => selectArchiveWorkout(row.original.id)}
                 >
+                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedArchiveWorkoutIds.includes(row.original.id)}
+                      onChange={() => toggleArchiveWorkoutSelection(row.original.id)}
+                      aria-label={`Выбрать архивную карточку ${row.original.title}`}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                  </TableCell>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {cell.column.id === 'title' ? (
+                        <div className="flex items-center gap-2">
+                          <span>{flexRender(cell.column.columnDef.cell, cell.getContext())}</span>
+                          {row.original.ready_for_retrieval ? (
+                            <Badge variant="outline">RAG</Badge>
+                          ) : null}
+                        </div>
+                      ) : (
+                        flexRender(cell.column.columnDef.cell, cell.getContext())
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>

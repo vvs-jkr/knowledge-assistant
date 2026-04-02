@@ -15,12 +15,15 @@ interface ArchiveFilters {
 interface WorkoutsState {
   selectedWorkoutId: string | null
   selectedArchiveWorkoutId: string | null
+  selectedArchiveWorkoutIds: string[]
   activeTab: 'list' | 'cards' | 'stats' | 'plans' | 'archive'
   selectedPlanId: string | null
   filters: WorkoutsFilters
   archiveFilters: ArchiveFilters
   selectWorkout: (id: string | null) => void
   selectArchiveWorkout: (id: string | null) => void
+  toggleArchiveWorkoutSelection: (id: string) => void
+  clearArchiveWorkoutSelection: () => void
   setActiveTab: (tab: 'list' | 'cards' | 'stats' | 'plans' | 'archive') => void
   selectPlan: (id: string | null) => void
   setFilter: (key: keyof WorkoutsFilters, value: string | null) => void
@@ -43,12 +46,20 @@ const defaultArchiveFilters: ArchiveFilters = {
 export const useWorkoutsStore = create<WorkoutsState>((set) => ({
   selectedWorkoutId: null,
   selectedArchiveWorkoutId: null,
+  selectedArchiveWorkoutIds: [],
   activeTab: 'cards',
   selectedPlanId: null,
   filters: { ...defaultFilters },
   archiveFilters: { ...defaultArchiveFilters },
   selectWorkout: (id) => set({ selectedWorkoutId: id }),
   selectArchiveWorkout: (id) => set({ selectedArchiveWorkoutId: id }),
+  toggleArchiveWorkoutSelection: (id) =>
+    set((state) => ({
+      selectedArchiveWorkoutIds: state.selectedArchiveWorkoutIds.includes(id)
+        ? state.selectedArchiveWorkoutIds.filter((item) => item !== id)
+        : [...state.selectedArchiveWorkoutIds, id],
+    })),
+  clearArchiveWorkoutSelection: () => set({ selectedArchiveWorkoutIds: [] }),
   setActiveTab: (tab) => set({ activeTab: tab }),
   selectPlan: (id) => set({ selectedPlanId: id }),
   setFilter: (key, value) =>

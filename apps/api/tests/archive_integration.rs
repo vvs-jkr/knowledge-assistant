@@ -87,6 +87,9 @@ async fn create_archived_workout_returns_detail_with_sections_and_images() {
         body["review_status"].as_str().expect("review_status"),
         "needs_review"
     );
+    assert!(!body["ready_for_retrieval"]
+        .as_bool()
+        .expect("ready_for_retrieval"));
     assert_eq!(body["sections"].as_array().expect("sections").len(), 2);
     assert_eq!(body["images"].as_array().expect("images").len(), 1);
     assert!(body["exclude_from_stats"]
@@ -182,6 +185,9 @@ async fn update_archived_workout_replaces_sections_and_marks_reviewed() {
         body["review_status"].as_str().expect("review_status"),
         "reviewed"
     );
+    assert!(!body["ready_for_retrieval"]
+        .as_bool()
+        .expect("ready_for_retrieval"));
     let sections = body["sections"].as_array().expect("sections");
     assert_eq!(sections.len(), 2);
     assert_eq!(
@@ -190,6 +196,62 @@ async fn update_archived_workout_replaces_sections_and_marks_reviewed() {
             .expect("content_corrected"),
         "10 min easy row"
     );
+}
+
+#[tokio::test]
+async fn batch_review_updates_status_and_ready_for_retrieval() {
+    let server = make_server().await;
+    let token = register_and_get_token(&server, "archive_batch_review@example.com").await;
+    let (name, val) = bearer(&token);
+
+    let first = server
+        .post("/archive/workouts")
+        .add_header(name.clone(), val.clone())
+        .json(&json!({
+            "archive_date": "2022-09-01",
+            "title": "Batch A",
+            "review_status": "needs_review"
+        }))
+        .await
+        .json::<Value>();
+    let second = server
+        .post("/archive/workouts")
+        .add_header(name.clone(), val.clone())
+        .json(&json!({
+            "archive_date": "2022-09-02",
+            "title": "Batch B",
+            "review_status": "needs_review"
+        }))
+        .await
+        .json::<Value>();
+
+    let res = server
+        .post("/archive/workouts/batch-review")
+        .add_header(name.clone(), val.clone())
+        .json(&json!({
+            "ids": [
+                first["id"].as_str().expect("first id"),
+                second["id"].as_str().expect("second id")
+            ],
+            "review_status": "corrected",
+            "ready_for_retrieval": true
+        }))
+        .await;
+
+    res.assert_status(StatusCode::OK);
+    assert_eq!(res.json::<Value>()["updated"].as_u64().expect("updated"), 2);
+
+    let detail = server
+        .get(&format!(
+            "/archive/workouts/{}",
+            first["id"].as_str().expect("first id")
+        ))
+        .add_header(name, val)
+        .await;
+    detail.assert_status_ok();
+    let body = detail.json::<Value>();
+    assert_eq!(body["review_status"], "corrected");
+    assert_eq!(body["ready_for_retrieval"], true);
 }
 
 #[tokio::test]

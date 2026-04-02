@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
   useArchivedWorkout,
@@ -23,6 +24,7 @@ export function ArchiveDetailPanel({ archiveWorkoutId }: { archiveWorkoutId: str
 
   const [title, setTitle] = useState('')
   const [reviewStatus, setReviewStatus] = useState<ArchiveReviewStatus>('raw')
+  const [readyForRetrieval, setReadyForRetrieval] = useState(false)
   const [rawText, setRawText] = useState('')
   const [correctedText, setCorrectedText] = useState('')
 
@@ -30,6 +32,7 @@ export function ArchiveDetailPanel({ archiveWorkoutId }: { archiveWorkoutId: str
     if (!data) return
     setTitle(data.title)
     setReviewStatus(data.review_status)
+    setReadyForRetrieval(data.ready_for_retrieval)
     setRawText(data.raw_ocr_text)
     setCorrectedText(data.corrected_text)
   }, [data])
@@ -50,6 +53,7 @@ export function ArchiveDetailPanel({ archiveWorkoutId }: { archiveWorkoutId: str
       id: data.id,
       title,
       review_status: reviewStatus,
+      ready_for_retrieval: readyForRetrieval,
       raw_ocr_text: rawText,
       corrected_text: correctedText,
     })
@@ -91,6 +95,16 @@ export function ArchiveDetailPanel({ archiveWorkoutId }: { archiveWorkoutId: str
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">Готово для retrieval</p>
+            <p className="text-xs text-muted-foreground">
+              Только такие архивные карточки попадут в RAG для генерации тренировок
+            </p>
+          </div>
+          <Switch checked={readyForRetrieval} onCheckedChange={setReadyForRetrieval} />
         </div>
 
         <div className="space-y-2">

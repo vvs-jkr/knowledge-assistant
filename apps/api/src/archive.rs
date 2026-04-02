@@ -16,6 +16,7 @@ pub struct ArchivedWorkoutSummary {
     pub source_system: String,
     pub source_type: String,
     pub review_status: String,
+    pub ready_for_retrieval: bool,
     pub quality_score: Option<f64>,
     pub section_count: i64,
     pub image_count: i64,
@@ -52,6 +53,7 @@ pub struct ArchivedWorkoutDetail {
     pub raw_ocr_text: String,
     pub corrected_text: String,
     pub review_status: String,
+    pub ready_for_retrieval: bool,
     pub quality_score: Option<f64>,
     pub exclude_from_stats: bool,
     pub created_at: String,
@@ -86,6 +88,7 @@ pub struct CreateArchivedWorkoutRequest {
     pub raw_ocr_text: Option<String>,
     pub corrected_text: Option<String>,
     pub review_status: Option<String>,
+    pub ready_for_retrieval: Option<bool>,
     pub quality_score: Option<f64>,
     pub exclude_from_stats: Option<bool>,
     pub sections: Option<Vec<ArchivedWorkoutSectionInput>>,
@@ -102,6 +105,7 @@ pub struct UpdateArchivedWorkoutRequest {
     pub raw_ocr_text: Option<String>,
     pub corrected_text: Option<String>,
     pub review_status: Option<String>,
+    pub ready_for_retrieval: Option<bool>,
     pub quality_score: Option<f64>,
     pub exclude_from_stats: Option<bool>,
     pub sections: Option<Vec<ArchivedWorkoutSectionInput>>,
@@ -118,6 +122,7 @@ pub struct ImportArchivedWorkoutItem {
     pub raw_ocr_text: Option<String>,
     pub corrected_text: Option<String>,
     pub review_status: Option<String>,
+    pub ready_for_retrieval: Option<bool>,
     pub quality_score: Option<f64>,
     pub exclude_from_stats: Option<bool>,
     pub sections: Option<Vec<ArchivedWorkoutSectionInput>>,
@@ -133,6 +138,18 @@ pub struct ImportArchivedWorkoutsRequest {
 pub struct ImportArchivedWorkoutsResponse {
     pub imported: usize,
     pub skipped: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchReviewArchivedWorkoutsRequest {
+    pub ids: Vec<String>,
+    pub review_status: Option<String>,
+    pub ready_for_retrieval: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BatchReviewArchivedWorkoutsResponse {
+    pub updated: usize,
 }
 
 #[derive(Debug, Deserialize, Default)]
