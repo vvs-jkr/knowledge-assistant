@@ -6,140 +6,87 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { useCreateWorkout, usePlans } from '@/features/workouts/api/workouts.api'
 import { WORKOUT_TYPE_LABELS } from '@/features/workouts/utils/workout-display'
-import {
-  DndContext,
-  type DragEndEvent,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-let rowCounter = 0
-const newRowId = () => `row-${++rowCounter}`
-
-interface ExerciseRow {
+interface SectionItemRow {
   id: string
   name: string
   sets: string
   reps: string
-  weight_kg: string
   weight_note: string
+  prescription_text: string
+  notes: string
 }
 
-const emptyExercise = (): ExerciseRow => ({
-  id: newRowId(),
-  name: '',
-  sets: '',
-  reps: '',
-  weight_kg: '',
-  weight_note: '',
-})
-
-const today = () => new Date().toISOString().slice(0, 10)
-
-function SortableExerciseRow({
-  ex,
-  canRemove,
-  onChange,
-  onRemove,
-}: {
-  ex: ExerciseRow
-  index: number
-  canRemove: boolean
-  onChange: (field: keyof ExerciseRow, value: string) => void
-  onRemove: () => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: ex.id,
-  })
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-1">
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-      <input
-        type="text"
-        value={ex.name}
-        onChange={(e) => onChange('name', e.target.value)}
-        placeholder="Упражнение"
-        className="min-w-0 flex-1 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-      />
-      <input
-        type="text"
-        inputMode="numeric"
-        value={ex.sets}
-        onChange={(e) => onChange('sets', e.target.value.replace(/[^\d]/g, ''))}
-        placeholder="п."
-        title="Подходы"
-        className="w-10 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-      />
-      <input
-        type="text"
-        inputMode="numeric"
-        value={ex.reps}
-        onChange={(e) => onChange('reps', e.target.value.replace(/[^\d]/g, ''))}
-        placeholder="р."
-        title="Повторения"
-        className="w-10 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-      />
-      <input
-        type="text"
-        inputMode="decimal"
-        value={ex.weight_kg}
-        onChange={(e) => onChange('weight_kg', e.target.value.replace(/[^\d.]/g, ''))}
-        placeholder="кг"
-        title="Вес (кг)"
-        className="w-14 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-      />
-      <input
-        type="text"
-        value={ex.weight_note}
-        onChange={(e) => onChange('weight_note', e.target.value)}
-        placeholder="заметка / время"
-        title="Заметка (время, структура)"
-        className="w-24 rounded border border-input bg-transparent px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring"
-      />
-      <button
-        type="button"
-        onClick={onRemove}
-        disabled={!canRemove}
-        className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive disabled:opacity-30"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  )
+interface SectionRow {
+  id: string
+  section_key: string
+  section_role: 'warmup' | 'strength_skill' | 'conditioning' | 'accessory_cooldown'
+  title: string
+  description: string
+  items: SectionItemRow[]
 }
 
 interface CreateWorkoutDialogProps {
   defaultPlanId?: string
   trigger?: React.ReactNode
 }
+
+const today = () => new Date().toISOString().slice(0, 10)
+
+let rowCounter = 0
+const newRowId = () => `row-${++rowCounter}`
+
+const createEmptyItem = (): SectionItemRow => ({
+  id: newRowId(),
+  name: '',
+  sets: '',
+  reps: '',
+  weight_note: '',
+  prescription_text: '',
+  notes: '',
+})
+
+const createDefaultSections = (): SectionRow[] => [
+  {
+    id: newRowId(),
+    section_key: 'A',
+    section_role: 'warmup',
+    title: 'Разминка',
+    description: '',
+    items: [createEmptyItem()],
+  },
+  {
+    id: newRowId(),
+    section_key: 'B',
+    section_role: 'strength_skill',
+    title: 'Силовая / техника',
+    description: '',
+    items: [createEmptyItem()],
+  },
+  {
+    id: newRowId(),
+    section_key: 'C',
+    section_role: 'conditioning',
+    title: 'Комплекс',
+    description: '',
+    items: [createEmptyItem()],
+  },
+  {
+    id: newRowId(),
+    section_key: 'D',
+    section_role: 'accessory_cooldown',
+    title: 'Подсоба / заминка',
+    description: '',
+    items: [createEmptyItem()],
+  },
+]
 
 export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDialogProps) {
   const [open, setOpen] = useState(false)
@@ -150,34 +97,10 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
   const [rounds, setRounds] = useState('')
   const [rawText, setRawText] = useState('')
   const [planId, setPlanId] = useState(defaultPlanId ?? '')
-  const [exercises, setExercises] = useState<ExerciseRow[]>([emptyExercise()])
+  const [sections, setSections] = useState<SectionRow[]>(createDefaultSections())
 
   const createWorkout = useCreateWorkout()
   const { data: plans } = usePlans()
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    setExercises((prev) => {
-      const oldIndex = prev.findIndex((ex) => ex.id === active.id)
-      const newIndex = prev.findIndex((ex) => ex.id === over.id)
-      if (oldIndex === -1 || newIndex === -1) return prev
-      const next = [...prev]
-      const [moved] = next.splice(oldIndex, 1)
-      next.splice(newIndex, 0, moved)
-      return next
-    })
-  }
-
-  const addExercise = () => setExercises((prev) => [...prev, emptyExercise()])
-  const removeExercise = (i: number) => setExercises((prev) => prev.filter((_, idx) => idx !== i))
-  const updateExercise = (i: number, field: keyof ExerciseRow, value: string) =>
-    setExercises((prev) => prev.map((ex, idx) => (idx === i ? { ...ex, [field]: value } : ex)))
 
   const reset = () => {
     setName('')
@@ -187,22 +110,93 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
     setRounds('')
     setRawText('')
     setPlanId(defaultPlanId ?? '')
-    setExercises([emptyExercise()])
+    setSections(createDefaultSections())
+  }
+
+  const updateSection = (sectionId: string, patch: Partial<SectionRow>) => {
+    setSections((prev) => prev.map((section) => (section.id === sectionId ? { ...section, ...patch } : section)))
+  }
+
+  const updateItem = (
+    sectionId: string,
+    itemId: string,
+    field: keyof SectionItemRow,
+    value: string
+  ) => {
+    setSections((prev) =>
+      prev.map((section) =>
+        section.id !== sectionId
+          ? section
+          : {
+              ...section,
+              items: section.items.map((item) =>
+                item.id === itemId ? { ...item, [field]: value } : item
+              ),
+            }
+      )
+    )
+  }
+
+  const addItem = (sectionId: string) => {
+    setSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? { ...section, items: [...section.items, createEmptyItem()] }
+          : section
+      )
+    )
+  }
+
+  const removeItem = (sectionId: string, itemId: string) => {
+    setSections((prev) =>
+      prev.map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              items:
+                section.items.length > 1
+                  ? section.items.filter((item) => item.id !== itemId)
+                  : section.items,
+            }
+          : section
+      )
+    )
   }
 
   const handleSubmit = () => {
     if (!name.trim()) return
 
-    const exerciseInputs = exercises
-      .filter((ex) => ex.name.trim())
-      .map((ex, i) => ({
-        name: ex.name.trim(),
-        order_index: i,
-        ...(ex.sets ? { sets: Number(ex.sets) } : {}),
-        ...(ex.reps ? { reps: Number(ex.reps) } : {}),
-        ...(ex.weight_kg ? { weight_kg: Number(ex.weight_kg) } : {}),
-        ...(ex.weight_note.trim() ? { weight_note: ex.weight_note.trim() } : {}),
-      }))
+    const sectionInputs = sections
+      .map((section, sectionIndex) => {
+        const items = section.items
+          .filter(
+            (item) =>
+              item.name.trim() ||
+              item.prescription_text.trim() ||
+              item.notes.trim()
+          )
+          .map((item, itemIndex) => ({
+            ...(item.name.trim() ? { name: item.name.trim() } : {}),
+            ...(item.sets ? { sets: Number(item.sets) } : {}),
+            ...(item.reps ? { reps: Number(item.reps) } : {}),
+            ...(item.weight_note.trim() ? { weight_note: item.weight_note.trim() } : {}),
+            ...(item.prescription_text.trim()
+              ? { prescription_text: item.prescription_text.trim() }
+              : {}),
+            ...(item.notes.trim() ? { notes: item.notes.trim() } : {}),
+            order_index: itemIndex,
+          }))
+
+        return {
+          section_key: section.section_key,
+          section_role: section.section_role,
+          title: section.title.trim() || section.section_key,
+          ...(section.description.trim() ? { description: section.description.trim() } : {}),
+          order_index: sectionIndex,
+          items,
+        }
+      })
+      .filter((section) => section.items.length > 0)
 
     createWorkout.mutate(
       {
@@ -214,7 +208,7 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
         ...(rawText.trim() ? { raw_text: rawText.trim() } : {}),
         ...(planId ? { plan_id: planId } : {}),
         source_type: 'manual',
-        exercises: exerciseInputs,
+        sections: sectionInputs,
       },
       {
         onSuccess: () => {
@@ -242,37 +236,29 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-x-hidden overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Добавить тренировку</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          {/* Name + date row */}
+
+        <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="mb-1 block text-sm font-medium" htmlFor="wk-name">
                 Название <span className="text-destructive">*</span>
               </label>
-              <input
+              <Input
                 id="wk-name"
-                type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Название тренировки"
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="wk-date">
                 Дата
               </label>
-              <input
-                id="wk-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
-              />
+              <Input id="wk-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="wk-type">
@@ -282,7 +268,7 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
                 id="wk-type"
                 value={workoutType}
                 onChange={(e) => setWorkoutType(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               >
                 {Object.entries(WORKOUT_TYPE_LABELS).map(([val, lbl]) => (
                   <option key={val} value={val}>
@@ -293,34 +279,29 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
             </div>
           </div>
 
-          {/* Duration + rounds + plan */}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="wk-duration">
                 Длит. (мин)
               </label>
-              <input
+              <Input
                 id="wk-duration"
-                type="text"
                 inputMode="numeric"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value.replace(/[^\d]/g, ''))}
                 placeholder="--"
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="wk-rounds">
                 Раунды
               </label>
-              <input
+              <Input
                 id="wk-rounds"
-                type="text"
                 inputMode="numeric"
                 value={rounds}
                 onChange={(e) => setRounds(e.target.value.replace(/[^\d]/g, ''))}
                 placeholder="--"
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
             <div>
@@ -331,75 +312,138 @@ export function CreateWorkoutDialog({ defaultPlanId, trigger }: CreateWorkoutDia
                 id="wk-plan"
                 value={planId}
                 onChange={(e) => setPlanId(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">--</option>
-                {plans?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
+                {plans?.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Raw text */}
           <div>
             <label className="mb-1 block text-sm font-medium" htmlFor="wk-raw">
-              Текст тренировки
+              Общие заметки / сырой текст
             </label>
-            <textarea
+            <Textarea
               id="wk-raw"
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder="Вставь текст тренировки от ассистента..."
-              rows={4}
-              className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+              placeholder="Общие заметки, описание сессии, контекст..."
+              className="min-h-[100px]"
             />
           </div>
 
-          {/* Exercises */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium">Упражнения</span>
-              <Button type="button" variant="ghost" size="sm" onClick={addExercise}>
-                <Plus className="mr-1 h-3 w-3" />
-                Добавить
-              </Button>
-            </div>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={exercises.map((ex) => ex.id)}
-                strategy={verticalListSortingStrategy}
-              >
+          <div className="space-y-4">
+            {sections.map((section) => (
+              <div key={section.id} className="rounded-xl border p-4">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="rounded-md border px-2 py-1 text-sm font-semibold">
+                    {section.section_key}
+                  </div>
+                  <Input
+                    value={section.title}
+                    onChange={(e) => updateSection(section.id, { title: e.target.value })}
+                    placeholder="Название секции"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <Textarea
+                    value={section.description}
+                    onChange={(e) => updateSection(section.id, { description: e.target.value })}
+                    placeholder="Краткое описание секции или формат работы"
+                    className="min-h-[70px]"
+                  />
+                </div>
+
                 <div className="space-y-2">
-                  {exercises.map((ex, i) => (
-                    <SortableExerciseRow
-                      key={ex.id}
-                      ex={ex}
-                      index={i}
-                      canRemove={exercises.length > 1}
-                      onChange={(field, value) => updateExercise(i, field, value)}
-                      onRemove={() => removeExercise(i)}
-                    />
+                  {section.items.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-dashed p-3">
+                      <div className="mb-2 grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1.4fr)_80px_80px_minmax(0,1fr)_auto]">
+                        <Input
+                          value={item.name}
+                          onChange={(e) => updateItem(section.id, item.id, 'name', e.target.value)}
+                          placeholder="Упражнение"
+                        />
+                        <Input
+                          inputMode="numeric"
+                          value={item.sets}
+                          onChange={(e) =>
+                            updateItem(
+                              section.id,
+                              item.id,
+                              'sets',
+                              e.target.value.replace(/[^\d]/g, '')
+                            )
+                          }
+                          placeholder="Подх."
+                        />
+                        <Input
+                          inputMode="numeric"
+                          value={item.reps}
+                          onChange={(e) =>
+                            updateItem(
+                              section.id,
+                              item.id,
+                              'reps',
+                              e.target.value.replace(/[^\d]/g, '')
+                            )
+                          }
+                          placeholder="Повт."
+                        />
+                        <Input
+                          value={item.weight_note}
+                          onChange={(e) =>
+                            updateItem(section.id, item.id, 'weight_note', e.target.value)
+                          }
+                          placeholder="Вес / интенсивность"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeItem(section.id, item.id)}
+                          disabled={section.items.length === 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                        <Textarea
+                          value={item.prescription_text}
+                          onChange={(e) =>
+                            updateItem(section.id, item.id, 'prescription_text', e.target.value)
+                          }
+                          placeholder="Схема / prescription. Например: 3 раунда не спеша"
+                          className="min-h-[80px]"
+                        />
+                        <Textarea
+                          value={item.notes}
+                          onChange={(e) => updateItem(section.id, item.id, 'notes', e.target.value)}
+                          placeholder="Заметки"
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </SortableContext>
-            </DndContext>
-            <p className="mt-1 text-xs text-muted-foreground">
-              п. = подходы, р. = повторения, заметка = время/структура
-            </p>
+
+                <div className="mt-3">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => addItem(section.id)}>
+                    <Plus className="mr-1 h-3 w-3" />
+                    Добавить элемент в {section.section_key}
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
 
-          <Button
-            className="w-full"
-            onClick={handleSubmit}
-            disabled={!name.trim() || createWorkout.isPending}
-          >
+          <Button className="w-full" onClick={handleSubmit} disabled={!name.trim() || createWorkout.isPending}>
             {createWorkout.isPending ? 'Сохранение...' : 'Сохранить тренировку'}
           </Button>
         </div>
