@@ -41,6 +41,7 @@ pub fn router() -> Router<AppState> {
         .route("/workouts/stats", get(get_stats))
         .route("/workouts/exercises", get(list_exercises))
         .route("/workouts/logs", get(list_logs).post(create_log))
+        .route("/workouts/logs/:id", axum::routing::delete(delete_log))
         .route("/workouts/plans", get(list_plans).post(create_plan))
         .route(
             "/workouts/plans/:id",
@@ -790,6 +791,29 @@ async fn list_logs(
         .collect::<ApiResult<Vec<_>>>()?;
 
     Ok(Json(logs))
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /workouts/logs/:id
+// ---------------------------------------------------------------------------
+
+async fn delete_log(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    let result = sqlx::query("DELETE FROM workout_logs WHERE id = ? AND user_id = ?")
+        .bind(&id)
+        .bind(&claims.sub)
+        .execute(&state.db)
+        .await
+        .map_err(AppError::from)?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ---------------------------------------------------------------------------

@@ -937,3 +937,38 @@ async fn list_logs_returns_created_log() {
         workout_id
     );
 }
+
+#[tokio::test]
+async fn delete_log_removes_completion_entry() {
+    let server = make_server().await;
+    let token = register_and_get_token(&server, "wk_logs_delete@example.com").await;
+    let (name, val) = bearer(&token);
+
+    let workout = create_basic_workout(&server, &token).await;
+    let workout_id = workout["id"].as_str().expect("workout_id");
+
+    let created = server
+        .post("/workouts/logs")
+        .add_header(
+            axum::http::header::AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {token}")).expect("header"),
+        )
+        .json(&json!({
+            "workout_id": workout_id,
+            "completed_at": "2026-03-10 08:00:00"
+        }))
+        .await
+        .json::<Value>();
+
+    let log_id = created["id"].as_str().expect("log id");
+
+    server
+        .delete(&format!("/workouts/logs/{log_id}"))
+        .add_header(name.clone(), val.clone())
+        .await
+        .assert_status(StatusCode::NO_CONTENT);
+
+    let res = server.get("/workouts/logs").add_header(name, val).await;
+    res.assert_status_ok();
+    assert_eq!(res.json::<Value>().as_array().expect("array").len(), 0);
+}

@@ -14,24 +14,41 @@ export function RegisterForm() {
 
   const form = useForm({
     defaultValues: { email: '', password: '' },
-    onSubmit: async ({ value }) => {
-      await register.mutateAsync(value, {
-        onSuccess: () => navigate('/notes'),
-        onError: (err: unknown) => {
-          const msg =
-            (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            'Не удалось зарегистрироваться'
-          toast.error(msg)
-        },
-      })
-    },
   })
+
+  async function handleSubmit(formEl: HTMLFormElement) {
+    if (register.isPending) {
+      return
+    }
+
+    const formData = new FormData(formEl)
+    const payload = {
+      email: String(formData.get('email') ?? '').trim(),
+      password: String(formData.get('password') ?? ''),
+    }
+
+    const parsed = registerSchema.safeParse(payload)
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? 'Проверь email и пароль')
+      return
+    }
+
+    await register.mutateAsync(parsed.data, {
+      onSuccess: () => navigate('/notes'),
+      onError: (err: unknown) => {
+        const msg =
+          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+          'Не удалось зарегистрироваться'
+        toast.error(msg)
+      },
+    })
+  }
 
   return (
     <form
-      onSubmit={(e: FormEvent<HTMLFormElement>) => {
+      onSubmit={async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        form.handleSubmit()
+        await handleSubmit(e.currentTarget)
       }}
       className="space-y-4"
     >
@@ -49,8 +66,10 @@ export function RegisterForm() {
             <Label htmlFor="reg-email">Email</Label>
             <Input
               id="reg-email"
+              name="email"
               type="email"
               placeholder="you@example.com"
+              autoComplete="email"
               value={field.state.value}
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
@@ -77,8 +96,10 @@ export function RegisterForm() {
             <Label htmlFor="reg-password">Пароль</Label>
             <Input
               id="reg-password"
+              name="password"
               type="password"
               placeholder="••••••••"
+              autoComplete="new-password"
               value={field.state.value}
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}

@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useLogin } from '@/features/auth/api/auth.api'
 import { LoginForm } from './LoginForm'
 
 vi.mock('@/features/auth/api/auth.api', () => ({
@@ -56,6 +57,31 @@ describe('LoginForm', () => {
     await user.tab()
     await waitFor(() => {
       expect(screen.getByText('Минимум 8 символов')).toBeDefined()
+    })
+  })
+
+  it('sets browser autocomplete hints for autofill', () => {
+    renderLoginForm()
+    expect(screen.getByLabelText('Email').getAttribute('autocomplete')).toBe('email')
+    expect(screen.getByLabelText('Пароль').getAttribute('autocomplete')).toBe('current-password')
+  })
+
+  it('submits login credentials', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(useLogin).mockReturnValue({ mutateAsync, isPending: false } as never)
+
+    const user = userEvent.setup()
+    renderLoginForm()
+
+    await user.type(screen.getByLabelText('Email'), 'user@example.com')
+    await user.type(screen.getByLabelText('Пароль'), 'Password123')
+    await user.click(screen.getByRole('button', { name: 'Войти' }))
+
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith(
+        { email: 'user@example.com', password: 'Password123' },
+        expect.any(Object),
+      )
     })
   })
 })

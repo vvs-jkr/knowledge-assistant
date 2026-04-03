@@ -14,24 +14,41 @@ export function LoginForm() {
 
   const form = useForm({
     defaultValues: { email: '', password: '' },
-    onSubmit: async ({ value }) => {
-      await login.mutateAsync(value, {
-        onSuccess: () => navigate('/notes'),
-        onError: (err: unknown) => {
-          const msg =
-            (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            'Не удалось войти'
-          toast.error(msg)
-        },
-      })
-    },
   })
+
+  async function handleSubmit(formEl: HTMLFormElement) {
+    if (login.isPending) {
+      return
+    }
+
+    const formData = new FormData(formEl)
+    const payload = {
+      email: String(formData.get('email') ?? '').trim(),
+      password: String(formData.get('password') ?? ''),
+    }
+
+    const parsed = loginSchema.safeParse(payload)
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? 'Проверь email и пароль')
+      return
+    }
+
+    await login.mutateAsync(parsed.data, {
+      onSuccess: () => navigate('/notes'),
+      onError: (err: unknown) => {
+        const msg =
+          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+          'Не удалось войти'
+        toast.error(msg)
+      },
+    })
+  }
 
   return (
     <form
-      onSubmit={(e: FormEvent<HTMLFormElement>) => {
+      onSubmit={async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault()
-        form.handleSubmit()
+        await handleSubmit(e.currentTarget)
       }}
       className="space-y-4"
     >
@@ -49,8 +66,10 @@ export function LoginForm() {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="you@example.com"
+              autoComplete="email"
               value={field.state.value}
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}
@@ -77,8 +96,10 @@ export function LoginForm() {
             <Label htmlFor="password">Пароль</Label>
             <Input
               id="password"
+              name="password"
               type="password"
               placeholder="••••••••"
+              autoComplete="current-password"
               value={field.state.value}
               onChange={(e) => field.handleChange(e.target.value)}
               onBlur={field.handleBlur}

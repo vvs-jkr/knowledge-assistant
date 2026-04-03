@@ -214,6 +214,8 @@ const workoutsApi = {
       return workoutLogSchema.parse(r.data)
     }),
 
+  deleteLog: (id: string): Promise<void> => api.delete(`/workouts/logs/${id}`).then(() => undefined),
+
   logs: (params?: LogsQuery): Promise<WorkoutLog[]> =>
     api.get<WorkoutLog[]>('/workouts/logs', { params }).then((r) => {
       return workoutLogSchema.array().parse(r.data)
@@ -317,6 +319,17 @@ export function useCreateWorkoutLog() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: workoutsApi.createLog,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['workouts', 'logs'] })
+      qc.invalidateQueries({ queryKey: ['workouts', 'stats'] })
+    },
+  })
+}
+
+export function useDeleteWorkoutLog() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => workoutsApi.deleteLog(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workouts', 'logs'] })
       qc.invalidateQueries({ queryKey: ['workouts', 'stats'] })

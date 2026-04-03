@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   useCreateWorkoutLog,
+  useDeleteWorkoutLog,
+  useWorkoutLogs,
   useDeleteWorkout,
   useUpdateWorkout,
   useWorkout,
@@ -229,10 +231,11 @@ function ExerciseEditRow({
 }
 
 interface WorkoutHeaderActionsProps {
-  createLogPending: boolean
+  toggleLogPending: boolean
+  isCompleted: boolean
   deletePending: boolean
   confirmDelete: boolean
-  onCreateLog: () => void
+  onToggleCompleted: () => void
   onStartEdit: () => void
   onConfirmDelete: () => void
   onDelete: () => void
@@ -240,10 +243,11 @@ interface WorkoutHeaderActionsProps {
 }
 
 function WorkoutHeaderActions({
-  createLogPending,
+  toggleLogPending,
+  isCompleted,
   deletePending,
   confirmDelete,
-  onCreateLog,
+  onToggleCompleted,
   onStartEdit,
   onConfirmDelete,
   onDelete,
@@ -254,12 +258,16 @@ function WorkoutHeaderActions({
       <Button
         variant="ghost"
         size="sm"
-        className="h-7 gap-1 px-2 text-xs text-green-600 hover:text-green-600 dark:text-green-400"
-        disabled={createLogPending}
-        onClick={onCreateLog}
+        className={`h-7 gap-1 px-2 text-xs ${
+          isCompleted
+            ? 'text-amber-700 hover:text-amber-700 dark:text-amber-400'
+            : 'text-green-700 hover:text-green-700 dark:text-green-400'
+        }`}
+        disabled={toggleLogPending}
+        onClick={onToggleCompleted}
       >
         <CheckCircle className="h-3.5 w-3.5" />
-        Выполнено
+        {isCompleted ? 'Снять выполнено' : 'Выполнено'}
       </Button>
       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onStartEdit}>
         <Pencil className="h-3.5 w-3.5" />
@@ -504,6 +512,8 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
   const updateWorkout = useUpdateWorkout()
   const deleteWorkout = useDeleteWorkout()
   const createLog = useCreateWorkoutLog()
+  const deleteLog = useDeleteWorkoutLog()
+  const { data: logs } = useWorkoutLogs(workoutId ? { workout_id: workoutId, limit: 1000 } : undefined)
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [name, setName] = useState('')
@@ -554,6 +564,9 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
     }
   }, [workoutId])
 
+  const latestLog = logs?.[0] ?? null
+  const isCompleted = latestLog !== null
+
   const handleDelete = () => {
     if (!workout) return
     deleteWorkout.mutate(workout.id, {
@@ -597,12 +610,23 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
     setEditing(false)
   }
 
-  const handleCreateLog = () => {
+  const handleToggleCompleted = () => {
     if (!workout) return
+    if (latestLog) {
+      deleteLog.mutate(latestLog.id, {
+        onSuccess: () => toast.success('Отметка выполнения снята'),
+        onError: () => toast.error('Не удалось снять отметку'),
+      })
+      return
+    }
+
     const today = new Date().toISOString().slice(0, 10)
     createLog.mutate(
       { workout_id: workout.id, completed_at: today },
-      { onSuccess: () => toast.success('Выполнено!') }
+      {
+        onSuccess: () => toast.success('Выполнено!'),
+        onError: () => toast.error('Не удалось отметить выполнение'),
+      },
     )
   }
 
@@ -662,10 +686,11 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
                 )}
                 {!editing && (
                   <WorkoutHeaderActions
-                    createLogPending={createLog.isPending}
+                    toggleLogPending={createLog.isPending || deleteLog.isPending}
+                    isCompleted={isCompleted}
                     deletePending={deleteWorkout.isPending}
                     confirmDelete={confirmDelete}
-                    onCreateLog={handleCreateLog}
+                    onToggleCompleted={handleToggleCompleted}
                     onStartEdit={() => setEditing(true)}
                     onConfirmDelete={() => setConfirmDelete(true)}
                     onDelete={handleDelete}
