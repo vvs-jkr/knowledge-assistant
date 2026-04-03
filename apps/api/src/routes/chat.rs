@@ -452,8 +452,9 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
         ));
     }
 
-    // KNN workout search: find examples most relevant to the user's query.
-    if !state.embedding_api_key.is_empty() && !query.is_empty() {
+    // KNN workout search: use active workouts only as a fallback when curated archive
+    // examples are not available for the current query.
+    if archive_context.is_empty() && !state.embedding_api_key.is_empty() && !query.is_empty() {
         match crate::embeddings::generate_embedding(
             &state.http_client,
             &state.embedding_api_key,
@@ -479,6 +480,7 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
                                   LEFT JOIN workout_exercises we ON we.workout_id = w.id
                                   LEFT JOIN exercises e ON e.id = we.exercise_id
                                   WHERE w.id = ? AND w.user_id = ?
+                                    AND w.source_type <> 'generated'
                                   GROUP BY w.id",
                             )
                             .bind(&workout_id)

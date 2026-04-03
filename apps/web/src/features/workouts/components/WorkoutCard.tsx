@@ -23,10 +23,10 @@ export function WorkoutCard({
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col gap-2 rounded-xl border p-4 text-left shadow-sm transition-all hover:shadow-md hover:border-foreground/20 border-l-4 ${borderColor} ${
+      className={`flex flex-col gap-2 rounded-xl border border-border p-4 text-left shadow-sm transition-all hover:shadow-md hover:border-foreground/20 border-l-4 ${borderColor} ${
         isCompleted
-          ? 'border-emerald-300 bg-emerald-100/95 ring-1 ring-emerald-300/70 dark:border-emerald-700 dark:bg-emerald-950/55 dark:ring-emerald-700/50'
-          : 'border-border bg-card'
+          ? 'bg-emerald-100/95 ring-2 ring-emerald-300/80 shadow-[0_0_0_1px_rgba(16,185,129,0.22)] dark:bg-emerald-950/55 dark:ring-emerald-700/60 dark:shadow-[0_0_0_1px_rgba(16,185,129,0.22)]'
+          : 'bg-card'
       }`}
     >
       <div className="flex items-start justify-between gap-2">
