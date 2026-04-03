@@ -349,10 +349,7 @@ async fn import_archived_workouts_keeps_same_date_and_title_when_content_differs
     assert_eq!(body["imported"].as_u64().expect("imported"), 2);
     assert_eq!(body["skipped"].as_u64().expect("skipped"), 0);
 
-    let list = server
-        .get("/archive/workouts")
-        .add_header(name, val)
-        .await;
+    let list = server.get("/archive/workouts").add_header(name, val).await;
     list.assert_status_ok();
     assert_eq!(list.json::<Value>().as_array().expect("items").len(), 2);
 }

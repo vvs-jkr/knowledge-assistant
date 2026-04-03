@@ -10,6 +10,7 @@ use sqlx::Row as _;
 
 use crate::{
     ai::{self, ChatTurn},
+    archive_context::build_archive_context,
     chat::{ChatMessage, ChatSession, RenameSessionRequest, SendMessageRequest},
     config::AppState,
     crypto,
@@ -401,24 +402,54 @@ async fn build_training_context(state: &AppState, user_id: &str, query: &str) ->
         }
     }
 
-    // Cached workout analysis summary.
-    let cache_row = sqlx::query("SELECT analysis FROM workout_analysis_cache WHERE user_id = ?")
+    let total_workouts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM workouts WHERE user_id = ?")
         .bind(user_id)
-        .fetch_optional(&state.db)
+        .fetch_one(&state.db)
         .await
         .map_err(AppError::from)?;
 
+    let last_workout_date: Option<String> =
+        sqlx::query_scalar("SELECT MAX(date) FROM workouts WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await
+            .map_err(AppError::from)?;
+
+    // Cached workout analysis summary.
+    let cache_row = sqlx::query(
+        "SELECT analysis, workout_count, last_workout_date
+         FROM workout_analysis_cache
+         WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
     if let Some(row) = cache_row {
-        let analysis_json: String = row.try_get("analysis").map_err(AppError::from)?;
-        if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&analysis_json) {
-            parts.push(format!(
-                "## Анализ тренировок\n{}\n\nПаттерны: {}\nБаланс мышц: {}\nРекомендуемый фокус: {}",
-                analysis.summary,
-                analysis.patterns.join("; "),
-                analysis.muscle_balance,
-                analysis.suggested_focus,
-            ));
+        let cached_count: i64 = row.try_get("workout_count").map_err(AppError::from)?;
+        let cached_last_date: String = row.try_get("last_workout_date").map_err(AppError::from)?;
+        let current_last_date = last_workout_date.unwrap_or_default();
+
+        if cached_count == total_workouts && cached_last_date == current_last_date {
+            let analysis_json: String = row.try_get("analysis").map_err(AppError::from)?;
+            if let Ok(analysis) = serde_json::from_str::<WorkoutAnalysis>(&analysis_json) {
+                parts.push(format!(
+                    "## Анализ тренировок\n{}\n\nПаттерны: {}\nБаланс мышц: {}\nРекомендуемый фокус: {}",
+                    analysis.summary,
+                    analysis.patterns.join("; "),
+                    analysis.muscle_balance,
+                    analysis.suggested_focus,
+                ));
+            }
         }
+    }
+
+    let archive_context = build_archive_context(&state.db, user_id, query, 5).await?;
+    if !archive_context.is_empty() {
+        parts.push(format!(
+            "## Архивные тренировки (используй как стиль/образец)\n{archive_context}"
+        ));
     }
 
     // KNN workout search: find examples most relevant to the user's query.

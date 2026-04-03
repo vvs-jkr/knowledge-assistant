@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod archive;
+pub mod archive_context;
 pub mod auth;
 pub mod chat;
 pub mod config;
