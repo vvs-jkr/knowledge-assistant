@@ -32,6 +32,8 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
     )
   }
 
+  const hasSections = workout.sections.length > 0
+
   return (
     <div className="flex flex-col gap-4 overflow-auto p-6">
       <div className="flex items-start justify-between gap-2">
@@ -46,7 +48,7 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
         {workout.rounds !== null && <span>{workout.rounds} раундов</span>}
       </div>
 
-      {workout.sections.length > 0 && (
+      {hasSections && (
         <div className="space-y-3">
           {workout.sections.map((section) => (
             <div key={section.id} className="rounded-lg border p-4">
@@ -79,7 +81,7 @@ export function WorkoutDetailPanel({ workoutId }: WorkoutDetailPanelProps) {
         </div>
       )}
 
-      <WorkoutExerciseList exercises={workout.exercises} />
+      {!hasSections && <WorkoutExerciseList exercises={workout.exercises} />}
 
       {workout.raw_text !== null && (
         <div className="rounded-md border">

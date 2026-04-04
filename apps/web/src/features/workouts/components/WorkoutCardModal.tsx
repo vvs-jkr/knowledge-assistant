@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -502,6 +503,44 @@ function WorkoutExercisesSection({
   )
 }
 
+function WorkoutSectionsView({ workout }: { workout: WorkoutDetail }) {
+  return (
+    <div className="space-y-3 pt-1">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Секции
+      </p>
+      {workout.sections.map((section) => (
+        <div key={section.id} className="rounded-lg border p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <Badge variant="outline">{section.section_key}</Badge>
+            <h3 className="text-sm font-semibold">{section.title}</h3>
+          </div>
+          {section.description && (
+            <p className="mb-2 text-sm text-muted-foreground">{section.description}</p>
+          )}
+          <div className="space-y-2">
+            {section.items.map((item) => (
+              <div key={item.id} className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="font-medium">{item.display_name}</span>
+                <span className="text-right text-muted-foreground">
+                  {[
+                    item.sets !== null ? `${item.sets} подх.` : null,
+                    item.reps !== null ? `x ${item.reps} повт.` : null,
+                    item.weight_note,
+                    item.prescription_text || null,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 interface WorkoutCardModalProps {
   workoutId: string | null
   onClose: () => void
@@ -566,6 +605,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
 
   const latestLog = logs?.[0] ?? null
   const isCompleted = latestLog !== null
+  const hasSections = workout?.sections.length ? workout.sections.length > 0 : false
 
   const handleDelete = () => {
     if (!workout) return
@@ -590,7 +630,7 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
         duration_mins: durationMins !== '' ? Number(durationMins) : null,
         rounds: rounds !== '' ? Number(rounds) : null,
         raw_text: rawText.trim() || null,
-        exercises: buildExerciseUpdatePayload(exerciseDrafts),
+        ...(!hasSections ? { exercises: buildExerciseUpdatePayload(exerciseDrafts) } : {}),
       },
       { onSuccess: () => setEditing(false) }
     )
@@ -721,16 +761,28 @@ export function WorkoutCardModal({ workoutId, onClose }: WorkoutCardModalProps) 
               onToggle={() => setRawTextOpen((open) => !open)}
             />
 
-            <WorkoutExercisesSection
-              editing={editing}
-              exerciseDrafts={exerciseDrafts}
-              workoutExercises={workout.exercises}
-              sensors={sensors}
-              onDragEnd={handleDragEnd}
-              onDraftChange={handleDraftChange}
-              onDraftRemove={handleDraftRemove}
-              onDraftAdd={handleDraftAdd}
-            />
+            {hasSections ? (
+              <>
+                <WorkoutSectionsView workout={workout} />
+                {editing && (
+                  <p className="text-xs text-muted-foreground">
+                    Редактирование секций в этой модалке пока не поддержано. Здесь можно менять
+                    только метаданные и исходный текст тренировки.
+                  </p>
+                )}
+              </>
+            ) : (
+              <WorkoutExercisesSection
+                editing={editing}
+                exerciseDrafts={exerciseDrafts}
+                workoutExercises={workout.exercises}
+                sensors={sensors}
+                onDragEnd={handleDragEnd}
+                onDraftChange={handleDraftChange}
+                onDraftRemove={handleDraftRemove}
+                onDraftAdd={handleDraftAdd}
+              />
+            )}
 
             {editing && (
               <div className="flex justify-end gap-2 pt-1">

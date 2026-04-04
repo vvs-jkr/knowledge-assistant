@@ -4,7 +4,7 @@ import { useChatMessages, useSendMessage } from '@/features/chat/api/chat.api'
 import { cn } from '@/lib/utils'
 import type { ChatMessage } from '@/shared/schemas/chat.schema'
 import { Send } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 
 interface Props {
@@ -16,6 +16,7 @@ export function ChatWindow({ sessionId }: Props) {
   const sendMessage = useSendMessage(sessionId)
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const lastMessageId = messages[messages.length - 1]?.id
   useEffect(() => {
@@ -26,10 +27,16 @@ export function ChatWindow({ sessionId }: Props) {
 
   const handleResize = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto'
-    const maxHeight = 20 * 5 + 16 // 5 lines + padding
+    const maxHeight = 220
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
     el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden'
   }
+
+  useLayoutEffect(() => {
+    if (textareaRef.current) {
+      handleResize(textareaRef.current)
+    }
+  }, [input])
 
   const handleSend = () => {
     const content = input.trim()
@@ -87,16 +94,14 @@ export function ChatWindow({ sessionId }: Props) {
         <TokenCounter messages={messages} />
         <div className="flex items-end gap-2">
           <textarea
+            ref={textareaRef}
             value={input}
-            onChange={(e) => {
-              setInput(e.target.value)
-              handleResize(e.target)
-            }}
+            onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Напиши вопрос... (Enter -- отправить, Shift+Enter -- новая строка)"
-            rows={1}
+            rows={3}
             disabled={sendMessage.isPending}
-            className="min-h-[38px] flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+            className="min-h-[84px] max-h-[220px] flex-1 resize-none rounded-md border border-input bg-background px-3 py-3 text-sm leading-5 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
           />
           <Button
             size="icon"
