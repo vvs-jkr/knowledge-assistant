@@ -2,48 +2,72 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useUploadHealth } from '@/features/health/api/health.api'
+import { useHealthStore } from '@/features/health/store/health.store'
 import { cn } from '@/lib/utils'
 import { Upload } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { toast } from 'sonner'
 
 export function HealthUpload() {
   const upload = useUploadHealth()
+  const activeSection = useHealthStore((s) => s.activeSection)
+  const selectRecord = useHealthStore((s) => s.selectRecord)
+  const selectLabBatch = useHealthStore((s) => s.selectLabBatch)
   const [labDate, setLabDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [labName, setLabName] = useState('')
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
-  const isCSV = pendingFile?.name.toLowerCase().endsWith('.csv') ?? false
+  const isInBody = activeSection === 'inbody'
+  const accept = useMemo(
+    () =>
+      isInBody
+        ? {
+            'text/csv': ['.csv'],
+            'application/vnd.ms-excel': ['.csv'],
+          }
+        : {
+            'application/pdf': ['.pdf'],
+          },
+    [isInBody]
+  )
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0]
-    if (file) setPendingFile(file)
+    setPendingFiles(acceptedFiles)
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'text/csv': ['.csv'],
-      'application/vnd.ms-excel': ['.csv'],
-    },
-    maxFiles: 1,
+    accept,
+    maxFiles: isInBody ? 1 : 7,
+    multiple: !isInBody,
     disabled: upload.isPending,
   })
 
   const handleSubmit = () => {
-    if (!pendingFile) return
+    if (pendingFiles.length === 0) return
     upload.mutate(
       {
-        file: pendingFile,
-        ...(isCSV ? {} : { labDate }),
+        files: pendingFiles,
+        ...(isInBody ? {} : { labDate }),
         ...(labName ? { labName } : {}),
       },
       {
         onSuccess: (data) => {
-          toast.success(`Загружено, извлечено показателей: ${data.metrics.length}`)
-          setPendingFile(null)
+          if (isInBody) {
+            const recordId = data.records[0]?.id ?? data.record?.id ?? null
+            selectRecord(recordId)
+          } else {
+            selectLabBatch(data.upload_batch_id ?? null)
+          }
+
+          if (data.metrics.length > 0) {
+            toast.success(`Загружено файлов: ${data.records.length}, извлечено показателей: ${data.metrics.length}`)
+          } else {
+            toast('Файлы загружены, но показатели не распознаны. Открой сдачу и проверь исходные PDF.')
+          }
+
+          setPendingFiles([])
           setLabName('')
         },
         onError: (err: unknown) => {
@@ -70,20 +94,28 @@ export function HealthUpload() {
       >
         <input {...getInputProps()} />
         <Upload className="h-5 w-5" />
-        {pendingFile ? (
-          <span className="font-medium text-foreground">{pendingFile.name}</span>
+        {pendingFiles.length > 0 ? (
+          <span className="text-center font-medium text-foreground">
+            {pendingFiles.length === 1
+              ? pendingFiles[0].name
+              : `Выбрано файлов: ${pendingFiles.length}`}
+          </span>
         ) : isDragActive ? (
           <span>Отпустите файл здесь</span>
         ) : (
-          <span>Перетащите PDF или CSV из InBody</span>
+          <span>
+            {isInBody
+              ? 'Перетащите CSV из InBody'
+              : 'Перетащите PDF анализов, от 1 до 7 файлов за одну сдачу'}
+          </span>
         )}
       </div>
 
-      {!isCSV && (
+      {!isInBody && (
         <>
           <div className="space-y-1.5">
             <Label htmlFor="lab-date" className="text-xs">
-              Дата анализа
+              Дата сдачи
             </Label>
             <Input
               id="lab-date"
@@ -96,12 +128,12 @@ export function HealthUpload() {
 
           <div className="space-y-1.5">
             <Label htmlFor="lab-name" className="text-xs">
-              Название лаборатории
+              Лаборатория
             </Label>
             <Input
               id="lab-name"
               type="text"
-              placeholder="например, Гемотест"
+              placeholder="например, Invitro"
               value={labName}
               onChange={(e) => setLabName(e.target.value)}
               className="h-8 text-sm"
@@ -110,9 +142,13 @@ export function HealthUpload() {
         </>
       )}
 
-      {isCSV && (
+      {isInBody ? (
         <p className="text-xs text-muted-foreground">
-          Дата и устройство будут прочитаны из CSV автоматически.
+          CSV из InBody хранится отдельно от анализов и не смешивается с ними в истории.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Все выбранные PDF будут сохранены как одна сдача анализов с общей датой и batch id.
         </p>
       )}
 
@@ -120,9 +156,13 @@ export function HealthUpload() {
         size="sm"
         className="w-full"
         onClick={handleSubmit}
-        disabled={!pendingFile || (!isCSV && !labDate) || upload.isPending}
+        disabled={pendingFiles.length === 0 || (!isInBody && !labDate) || upload.isPending}
       >
-        {upload.isPending ? 'Загрузка...' : isCSV ? 'Загрузить CSV' : 'Загрузить и распознать'}
+        {upload.isPending
+          ? 'Загрузка...'
+          : isInBody
+            ? 'Загрузить InBody CSV'
+            : `Загрузить анализы${pendingFiles.length > 1 ? ` (${pendingFiles.length})` : ''}`}
       </Button>
     </div>
   )

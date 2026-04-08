@@ -1,20 +1,31 @@
 import { api } from '@/shared/lib/api'
 import { downloadBlob } from '@/shared/lib/download'
 import {
+  type HealthConsultResponse,
+  type HealthLabBatchDetail,
+  type HealthLabBatchSummary,
   type HealthMetric,
+  type HealthRecordDetail,
+  type HealthRecordKind,
   type HealthRecordMeta,
   type MetricsQuery,
   type UploadHealthResponse,
+  healthConsultResponseSchema,
+  healthLabBatchDetailSchema,
+  healthLabBatchSummarySchema,
   healthMetricSchema,
+  healthRecordDetailSchema,
   healthRecordMetaSchema,
   uploadHealthResponseSchema,
 } from '@/shared/schemas/health.schema'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 const healthApi = {
-  upload: (file: File, labDate?: string, labName?: string) => {
+  upload: (files: File[], labDate?: string, labName?: string) => {
     const form = new FormData()
-    form.append('file', file)
+    for (const file of files) {
+      form.append('file', file)
+    }
     if (labDate) form.append('lab_date', labDate)
     if (labName) form.append('lab_name', labName)
     return api
@@ -22,10 +33,35 @@ const healthApi = {
       .then((r) => uploadHealthResponseSchema.parse(r.data))
   },
 
-  records: () =>
+  records: (kind?: HealthRecordKind) =>
     api
-      .get<HealthRecordMeta[]>('/health/records')
+      .get<HealthRecordMeta[]>('/health/records', { params: kind ? { kind } : undefined })
       .then((r) => healthRecordMetaSchema.array().parse(r.data)),
+
+  record: (id: string) =>
+    api
+      .get<HealthRecordDetail>(`/health/records/${id}`)
+      .then((r) => healthRecordDetailSchema.parse(r.data)),
+
+  recordFile: (id: string): Promise<Blob> =>
+    api
+      .get(`/health/records/${id}/file`, { responseType: 'blob' })
+      .then((r) => r.data as Blob),
+
+  labBatches: () =>
+    api
+      .get<HealthLabBatchSummary[]>('/health/lab-batches')
+      .then((r) => healthLabBatchSummarySchema.array().parse(r.data)),
+
+  labBatch: (id: string) =>
+    api
+      .get<HealthLabBatchDetail>(`/health/lab-batches/${id}`)
+      .then((r) => healthLabBatchDetailSchema.parse(r.data)),
+
+  consultLabBatch: (id: string, question: string) =>
+    api
+      .post<HealthConsultResponse>(`/health/lab-batches/${id}/consult`, { question })
+      .then((r) => healthConsultResponseSchema.parse(r.data)),
 
   deleteRecord: (id: string) => api.delete(`/health/records/${id}`),
 
@@ -38,10 +74,10 @@ const healthApi = {
     api.get('/health/export', { params, responseType: 'blob' }).then((r) => r.data as Blob),
 }
 
-export function useHealthRecords() {
+export function useHealthRecords(kind?: HealthRecordKind) {
   return useQuery({
-    queryKey: ['health', 'records'],
-    queryFn: healthApi.records,
+    queryKey: ['health', 'records', kind ?? null],
+    queryFn: () => healthApi.records(kind),
     staleTime: 30_000,
   })
 }
@@ -54,20 +90,62 @@ export function useHealthMetrics(params?: MetricsQuery) {
   })
 }
 
+export function useHealthRecord(id: string | null) {
+  return useQuery({
+    queryKey: ['health', 'record', id],
+    queryFn: () => healthApi.record(id as string),
+    enabled: id !== null,
+    staleTime: 30_000,
+  })
+}
+
+export function useHealthLabBatches() {
+  return useQuery({
+    queryKey: ['health', 'lab-batches'],
+    queryFn: healthApi.labBatches,
+    staleTime: 30_000,
+  })
+}
+
+export function useHealthLabBatch(id: string | null) {
+  return useQuery({
+    queryKey: ['health', 'lab-batch', id],
+    queryFn: () => healthApi.labBatch(id as string),
+    enabled: id !== null,
+    staleTime: 30_000,
+  })
+}
+
+export function useConsultLabBatch(id: string | null) {
+  return useMutation({
+    mutationFn: (question: string) => healthApi.consultLabBatch(id as string, question),
+  })
+}
+
+export function useHealthRecordFile(id: string | null) {
+  return useQuery({
+    queryKey: ['health', 'record-file', id],
+    queryFn: () => healthApi.recordFile(id as string),
+    enabled: id !== null,
+    staleTime: 30_000,
+  })
+}
+
 export function useUploadHealth() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
-      file,
+      files,
       labDate,
       labName,
     }: {
-      file: File
+      files: File[]
       labDate?: string
       labName?: string
-    }) => healthApi.upload(file, labDate, labName),
+    }) => healthApi.upload(files, labDate, labName),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['health', 'records'] })
+      qc.invalidateQueries({ queryKey: ['health', 'lab-batches'] })
       qc.invalidateQueries({ queryKey: ['health', 'metrics'] })
     },
   })
@@ -79,6 +157,7 @@ export function useDeleteHealthRecord() {
     mutationFn: healthApi.deleteRecord,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['health', 'records'] })
+      qc.invalidateQueries({ queryKey: ['health', 'lab-batches'] })
       qc.invalidateQueries({ queryKey: ['health', 'metrics'] })
     },
   })

@@ -21,6 +21,6 @@ describe('WorkoutCard', () => {
 
     const card = screen.getByRole('button')
     expect(card.className.includes('bg-emerald-100/95')).toBe(true)
-    expect(card.className.includes('border-emerald-300')).toBe(true)
+    expect(card.className.includes('ring-emerald-300/80')).toBe(true)
   })
 })

@@ -10,13 +10,21 @@ vi.mock('@/features/health/api/health.api', () => ({
 }))
 
 const resetStore = () =>
-  useHealthStore.setState({ selectedRecordId: null, selectedMetric: null, dateRange: null })
+  useHealthStore.setState({
+    activeSection: 'inbody',
+    selectedRecordId: null,
+    selectedLabBatchId: null,
+    selectedMetric: null,
+    dateRange: null,
+  })
 
 const mockRecord = {
   id: 'rec-1',
   filename: 'lab.pdf',
   lab_date: '2026-01-15',
   lab_name: 'City Lab',
+  source_kind: 'inbody' as const,
+  upload_batch_id: null,
   pdf_size_bytes: 204800,
   metrics_count: 3,
   created_at: '2026-01-15T12:00:00Z',
@@ -30,12 +38,12 @@ describe('HealthRecordList', () => {
 
   it('shows empty state when no records exist', () => {
     render(<HealthRecordList />)
-    expect(screen.getByText('No records yet')).toBeDefined()
+    expect(screen.getByText('InBody записей пока нет')).toBeDefined()
   })
 
   it('shows skeleton rows while loading', async () => {
     const { useHealthRecords } = await import('@/features/health/api/health.api')
-    vi.mocked(useHealthRecords).mockReturnValueOnce({
+    vi.mocked(useHealthRecords).mockReturnValue({
       data: undefined,
       isLoading: true,
     } as ReturnType<typeof useHealthRecords>)
@@ -45,7 +53,7 @@ describe('HealthRecordList', () => {
 
   it('renders record lab_date when records are present', async () => {
     const { useHealthRecords } = await import('@/features/health/api/health.api')
-    vi.mocked(useHealthRecords).mockReturnValueOnce({
+    vi.mocked(useHealthRecords).mockReturnValue({
       data: [mockRecord],
       isLoading: false,
     } as ReturnType<typeof useHealthRecords>)
@@ -67,7 +75,7 @@ describe('HealthRecordList', () => {
 
   it('renders multiple records', async () => {
     const { useHealthRecords } = await import('@/features/health/api/health.api')
-    vi.mocked(useHealthRecords).mockReturnValueOnce({
+    vi.mocked(useHealthRecords).mockReturnValue({
       data: [mockRecord, { ...mockRecord, id: 'rec-2', lab_date: '2026-02-10' }],
       isLoading: false,
     } as ReturnType<typeof useHealthRecords>)

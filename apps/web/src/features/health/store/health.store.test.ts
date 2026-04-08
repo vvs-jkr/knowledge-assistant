@@ -3,7 +3,9 @@ import { useHealthStore } from './health.store'
 
 beforeEach(() => {
   useHealthStore.setState({
+    activeSection: 'inbody',
     selectedRecordId: null,
+    selectedLabBatchId: null,
     selectedMetric: null,
     dateRange: null,
   })
@@ -12,14 +14,26 @@ beforeEach(() => {
 describe('useHealthStore', () => {
   it('starts with null state', () => {
     const state = useHealthStore.getState()
+    expect(state.activeSection).toBe('inbody')
     expect(state.selectedRecordId).toBeNull()
+    expect(state.selectedLabBatchId).toBeNull()
     expect(state.selectedMetric).toBeNull()
     expect(state.dateRange).toBeNull()
+  })
+
+  it('setActiveSection switches section', () => {
+    useHealthStore.getState().setActiveSection('labs')
+    expect(useHealthStore.getState().activeSection).toBe('labs')
   })
 
   it('selectRecord sets selectedRecordId', () => {
     useHealthStore.getState().selectRecord('record-1')
     expect(useHealthStore.getState().selectedRecordId).toBe('record-1')
+  })
+
+  it('selectLabBatch sets selectedLabBatchId', () => {
+    useHealthStore.getState().selectLabBatch('batch-1')
+    expect(useHealthStore.getState().selectedLabBatchId).toBe('batch-1')
   })
 
   it('selectRecord with null clears selection', () => {

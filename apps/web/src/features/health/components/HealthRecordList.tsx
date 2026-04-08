@@ -16,6 +16,7 @@ import { useDeleteHealthRecord, useHealthRecords } from '@/features/health/api/h
 import { useHealthStore } from '@/features/health/store/health.store'
 import { cn } from '@/lib/utils'
 import { Trash2 } from 'lucide-react'
+import { useEffect } from 'react'
 import { toast } from 'sonner'
 
 function formatBytes(bytes: number): string {
@@ -25,10 +26,16 @@ function formatBytes(bytes: number): string {
 }
 
 export function HealthRecordList() {
-  const { data: records, isLoading } = useHealthRecords()
+  const { data: records, isLoading } = useHealthRecords('inbody')
   const selectedRecordId = useHealthStore((s) => s.selectedRecordId)
   const selectRecord = useHealthStore((s) => s.selectRecord)
   const deleteRecord = useDeleteHealthRecord()
+
+  useEffect(() => {
+    if (!selectedRecordId && records && records.length > 0) {
+      selectRecord(records[0].id)
+    }
+  }, [records, selectRecord, selectedRecordId])
 
   if (isLoading) {
     return (
@@ -43,8 +50,8 @@ export function HealthRecordList() {
   if (!records?.length) {
     return (
       <div className="flex flex-col items-center justify-center gap-1 p-8 text-center text-sm text-muted-foreground">
-        <p>No records yet</p>
-        <p>Upload a PDF above</p>
+        <p>InBody записей пока нет</p>
+        <p>Загрузи CSV выше</p>
       </div>
     )
   }
@@ -69,7 +76,7 @@ export function HealthRecordList() {
             >
               <p className="truncate font-medium">{record.lab_date}</p>
               <p className="truncate text-xs text-muted-foreground">
-                {record.lab_name || record.filename} · {record.metrics_count} metrics ·{' '}
+                {record.lab_name || record.filename} · {record.metrics_count} метрик ·{' '}
                 {formatBytes(record.pdf_size_bytes)}
               </p>
             </button>
@@ -87,27 +94,26 @@ export function HealthRecordList() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete record?</AlertDialogTitle>
+                    <AlertDialogTitle>Удалить InBody запись?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will permanently delete the lab record from {record.lab_date} and all
-                      extracted metrics. This action cannot be undone.
+                      Это навсегда удалит запись от {record.lab_date} и все извлечённые метрики.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
                     <AlertDialogAction
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       onClick={() => {
                         deleteRecord.mutate(record.id, {
                           onSuccess: () => {
                             if (selectedRecordId === record.id) selectRecord(null)
-                            toast.success('Record deleted')
+                            toast.success('Запись удалена')
                           },
-                          onError: () => toast.error('Failed to delete record'),
+                          onError: () => toast.error('Не удалось удалить запись'),
                         })
                       }}
                     >
-                      Delete
+                      Удалить
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

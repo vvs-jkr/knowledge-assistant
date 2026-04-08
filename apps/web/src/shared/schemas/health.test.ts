@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  healthLabBatchDetailSchema,
+  healthLabBatchSummarySchema,
   healthMetricSchema,
   healthRecordMetaSchema,
   uploadHealthResponseSchema,
@@ -22,6 +24,8 @@ const baseRecord = {
   filename: 'lab.pdf',
   lab_date: '2026-01-15',
   lab_name: 'City Lab',
+  source_kind: 'lab_report' as const,
+  upload_batch_id: 'batch-1',
   pdf_size_bytes: 204800,
   metrics_count: 3,
   created_at: '2026-01-15T12:00:00Z',
@@ -81,21 +85,56 @@ describe('healthRecordMetaSchema', () => {
 
 describe('uploadHealthResponseSchema', () => {
   it('accepts valid upload response', () => {
-    const data = { record: baseRecord, metrics: [baseMetric] }
+    const data = { record: baseRecord, records: [baseRecord], metrics: [baseMetric], upload_batch_id: 'batch-1' }
     expect(uploadHealthResponseSchema.safeParse(data).success).toBe(true)
   })
 
   it('accepts empty metrics array', () => {
-    const data = { record: baseRecord, metrics: [] }
+    const data = { record: baseRecord, records: [baseRecord], metrics: [], upload_batch_id: null }
     expect(uploadHealthResponseSchema.safeParse(data).success).toBe(true)
   })
 
   it('rejects missing record', () => {
-    expect(uploadHealthResponseSchema.safeParse({ metrics: [] }).success).toBe(false)
+    expect(uploadHealthResponseSchema.safeParse({ records: [], metrics: [], upload_batch_id: null }).success).toBe(false)
   })
 
   it('rejects invalid metric in metrics array', () => {
-    const data = { record: baseRecord, metrics: [{ ...baseMetric, status: 'bad' }] }
+    const data = {
+      record: baseRecord,
+      records: [baseRecord],
+      metrics: [{ ...baseMetric, status: 'bad' }],
+      upload_batch_id: 'batch-1',
+    }
     expect(uploadHealthResponseSchema.safeParse(data).success).toBe(false)
+  })
+})
+
+describe('healthLabBatch schemas', () => {
+  it('accepts valid batch summary', () => {
+    expect(
+      healthLabBatchSummarySchema.safeParse({
+        id: 'batch-1',
+        lab_date: '2026-01-15',
+        lab_name: 'City Lab',
+        file_count: 2,
+        metrics_count: 5,
+        created_at: '2026-01-15T12:00:00Z',
+      }).success
+    ).toBe(true)
+  })
+
+  it('accepts valid batch detail', () => {
+    expect(
+      healthLabBatchDetailSchema.safeParse({
+        id: 'batch-1',
+        lab_date: '2026-01-15',
+        lab_name: 'City Lab',
+        file_count: 2,
+        metrics_count: 5,
+        created_at: '2026-01-15T12:00:00Z',
+        records: [baseRecord],
+        metrics: [baseMetric],
+      }).success
+    ).toBe(true)
   })
 })

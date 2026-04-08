@@ -60,15 +60,56 @@ pub struct MetricValue {
 }
 
 /// Health record metadata returned by list / upload endpoints.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct HealthRecordMeta {
     pub id: String,
     pub filename: String,
     pub lab_date: String,
     pub lab_name: String,
+    pub source_kind: String,
+    pub upload_batch_id: Option<String>,
     pub pdf_size_bytes: i64,
     pub metrics_count: i64,
     pub created_at: String,
+}
+
+/// Full health record detail with decrypted metrics.
+#[derive(Debug, Serialize)]
+pub struct HealthRecordDetail {
+    pub id: String,
+    pub filename: String,
+    pub lab_date: String,
+    pub lab_name: String,
+    pub source_kind: String,
+    pub upload_batch_id: Option<String>,
+    pub pdf_size_bytes: i64,
+    pub metrics_count: i64,
+    pub created_at: String,
+    pub metrics: Vec<HealthMetric>,
+}
+
+/// Summary of a grouped lab-analysis upload batch.
+#[derive(Debug, Serialize)]
+pub struct HealthLabBatchSummary {
+    pub id: String,
+    pub lab_date: String,
+    pub lab_name: String,
+    pub file_count: i64,
+    pub metrics_count: i64,
+    pub created_at: String,
+}
+
+/// Full lab-analysis batch detail with all files and aggregated metrics.
+#[derive(Debug, Serialize)]
+pub struct HealthLabBatchDetail {
+    pub id: String,
+    pub lab_date: String,
+    pub lab_name: String,
+    pub file_count: i64,
+    pub metrics_count: i64,
+    pub created_at: String,
+    pub records: Vec<HealthRecordMeta>,
+    pub metrics: Vec<HealthMetric>,
 }
 
 /// Decrypted health metric included in API responses.
@@ -110,8 +151,20 @@ pub struct LabExtraction {
 /// Response body for `POST /health/upload`.
 #[derive(Serialize)]
 pub struct UploadHealthResponse {
-    pub record: HealthRecordMeta,
+    pub record: Option<HealthRecordMeta>,
+    pub records: Vec<HealthRecordMeta>,
     pub metrics: Vec<HealthMetric>,
+    pub upload_batch_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HealthConsultRequest {
+    pub question: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct HealthConsultResponse {
+    pub answer: String,
 }
 
 // ---------------------------------------------------------------------------

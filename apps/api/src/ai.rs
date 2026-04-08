@@ -664,6 +664,67 @@ pub async fn chat(
         .ok_or_else(|| AppError::Internal(anyhow::anyhow!("missing content in chat response")))
 }
 
+pub async fn consult_lab_results(
+    http_client: &reqwest::Client,
+    api_key: &str,
+    model: &str,
+    lab_context: &str,
+    question: &str,
+) -> ApiResult<String> {
+    let body = serde_json::json!({
+        "model": model,
+        "max_tokens": 1400,
+        "messages": [
+            {
+                "role": "system",
+                "content": concat!(
+                    "Ты консультант по медицинским анализам. Отвечай только на русском языке. ",
+                    "Работай только с предоставленной сдачей анализов и вопросом пользователя. ",
+                    "Не ставь диагноз. Не утверждай то, чего нет в данных. ",
+                    "Обязательно указывай, что твой ответ не заменяет врача. ",
+                    "Если есть отклонения, объясняй простым языком: что выбивается, что это обычно может означать, ",
+                    "какие вопросы стоит уточнить у врача, и какие повторные/смежные анализы иногда бывают уместны. ",
+                    "Если данных мало, прямо скажи об этом."
+                )
+            },
+            {
+                "role": "user",
+                "content": format!("## Сдача анализов\n{lab_context}\n\n## Вопрос пользователя\n{question}")
+            }
+        ],
+    });
+
+    let resp = http_client
+        .post("https://openrouter.ai/api/v1/chat/completions")
+        .bearer_auth(api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("lab consult request failed: {e}")))?;
+
+    let status = resp.status();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("read lab consult response: {e}")))?;
+
+    if !status.is_success() {
+        return Err(AppError::Internal(anyhow::anyhow!(
+            "lab consult API error {status}: {text}"
+        )));
+    }
+
+    let val: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| AppError::Internal(anyhow::anyhow!("parse lab consult response: {e}")))?;
+
+    val["choices"][0]["message"]["content"]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            AppError::Internal(anyhow::anyhow!("missing content in lab consult response"))
+        })
+}
+
 fn chat_system_prompt(training_context: &str) -> String {
     let mut prompt = String::from(
         "Ты персональный фитнес-тренер и консультант по здоровью. \
