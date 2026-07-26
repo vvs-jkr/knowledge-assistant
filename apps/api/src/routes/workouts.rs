@@ -41,14 +41,14 @@ pub fn router() -> Router<AppState> {
         .route("/workouts/stats", get(get_stats))
         .route("/workouts/exercises", get(list_exercises))
         .route("/workouts/logs", get(list_logs).post(create_log))
-        .route("/workouts/logs/:id", axum::routing::delete(delete_log))
+        .route("/workouts/logs/{id}", axum::routing::delete(delete_log))
         .route("/workouts/plans", get(list_plans).post(create_plan))
         .route(
-            "/workouts/plans/:id",
+            "/workouts/plans/{id}",
             get(get_plan).put(update_plan).delete(delete_plan),
         )
         .route(
-            "/workouts/:id",
+            "/workouts/{id}",
             get(get_workout).put(update_workout).delete(delete_workout),
         )
 }

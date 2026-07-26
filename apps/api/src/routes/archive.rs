@@ -36,7 +36,7 @@ pub fn router() -> Router<AppState> {
             axum::routing::post(batch_review_archived_workouts),
         )
         .route(
-            "/archive/workouts/:id",
+            "/archive/workouts/{id}",
             get(get_archived_workout).put(update_archived_workout),
         )
 }

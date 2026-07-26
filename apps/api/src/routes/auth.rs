@@ -17,29 +17,26 @@ use axum::{
 };
 
 pub fn router(rate_limit_enabled: bool) -> Router<AppState> {
-    use tower::ServiceBuilder;
     use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 
-    let governor_layer = if rate_limit_enabled {
+    let rate_limited = Router::new()
+        .route("/auth/register", post(register))
+        .route("/auth/login", post(login))
+        .route("/auth/refresh", post(refresh))
+        .route("/auth/logout", post(logout));
+
+    let rate_limited = if rate_limit_enabled {
         let conf = GovernorConfigBuilder::default()
             .per_second(12)
             .burst_size(5)
             .finish()
             .expect("valid governor config");
-        Some(GovernorLayer {
-            config: conf.into(),
-        })
+        rate_limited.route_layer(GovernorLayer::new(conf))
     } else {
-        None
+        rate_limited
     };
 
-    Router::new()
-        .route("/auth/register", post(register))
-        .route("/auth/login", post(login))
-        .route("/auth/refresh", post(refresh))
-        .route("/auth/logout", post(logout))
-        .route_layer(ServiceBuilder::new().option_layer(governor_layer))
-        .route("/auth/me", get(me))
+    rate_limited.route("/auth/me", get(me))
 }
 
 // ---------------------------------------------------------------------------

@@ -28,11 +28,14 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/health/upload", post(upload_health))
         .route("/health/records", get(list_records))
-        .route("/health/records/:id", get(get_record).delete(delete_record))
-        .route("/health/records/:id/file", get(download_record_file))
+        .route(
+            "/health/records/{id}",
+            get(get_record).delete(delete_record),
+        )
+        .route("/health/records/{id}/file", get(download_record_file))
         .route("/health/lab-batches", get(list_lab_batches))
-        .route("/health/lab-batches/:id", get(get_lab_batch))
-        .route("/health/lab-batches/:id/consult", post(consult_lab_batch))
+        .route("/health/lab-batches/{id}", get(get_lab_batch))
+        .route("/health/lab-batches/{id}/consult", post(consult_lab_batch))
         .route("/health/metrics", get(list_metrics))
         .route("/health/export", get(export_health))
         .layer(DefaultBodyLimit::max(MAX_FILE_SIZE))

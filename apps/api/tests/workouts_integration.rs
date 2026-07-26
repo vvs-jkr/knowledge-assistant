@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 async fn make_server() -> TestServer {
     let state = build_test_state().await;
     let app = build_app(state);
-    TestServer::new(app).expect("test server")
+    TestServer::new(app)
 }
 
 async fn register_and_get_token(server: &TestServer, email: &str) -> String {
@@ -47,7 +47,7 @@ async fn create_basic_workout(server: &TestServer, token: &str) -> Value {
 }
 
 // ---------------------------------------------------------------------------
-// Auth guards — all endpoints must require a valid JWT
+// Auth guards -- all endpoints must require a valid JWT
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -605,7 +605,7 @@ async fn delete_workout_returns_204_and_then_404() {
 }
 
 // ---------------------------------------------------------------------------
-// Isolation — users cannot see each other's workouts
+// Isolation -- users cannot see each other's workouts
 // ---------------------------------------------------------------------------
 
 #[tokio::test]

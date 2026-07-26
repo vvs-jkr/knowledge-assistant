@@ -67,13 +67,13 @@ fn voyage_response_body() -> serde_json::Value {
 }
 
 // ---------------------------------------------------------------------------
-// POST /notes/search — auth
+// POST /notes/search -- auth
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn search_without_auth_returns_401() {
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
 
     let resp = server
         .post("/notes/search")
@@ -83,13 +83,13 @@ async fn search_without_auth_returns_401() {
 }
 
 // ---------------------------------------------------------------------------
-// POST /notes/search — validation
+// POST /notes/search -- validation
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn search_empty_query_returns_400() {
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "s@test.com").await;
     let (h, v) = bearer(&token);
 
@@ -105,7 +105,7 @@ async fn search_empty_query_returns_400() {
 async fn search_without_voyage_key_returns_400() {
     // build_test_state sets voyage_api_key = "" so search returns 400.
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "s2@test.com").await;
     let (h, v) = bearer(&token);
 
@@ -118,26 +118,26 @@ async fn search_without_voyage_key_returns_400() {
 }
 
 // ---------------------------------------------------------------------------
-// POST /notes/:id/analyze — auth
+// POST /notes/:id/analyze -- auth
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn analyze_without_auth_returns_401() {
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
 
     let resp = server.post("/notes/nonexistent/analyze").await;
     assert_eq!(resp.status_code(), 401);
 }
 
 // ---------------------------------------------------------------------------
-// POST /notes/:id/analyze — missing API key
+// POST /notes/:id/analyze -- missing API key
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn analyze_without_anthropic_key_returns_400() {
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "a@test.com").await;
     let (h, v) = bearer(&token);
 
@@ -149,14 +149,14 @@ async fn analyze_without_anthropic_key_returns_400() {
 }
 
 // ---------------------------------------------------------------------------
-// POST /notes/:id/analyze — not found / ownership
+// POST /notes/:id/analyze -- not found / ownership
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn analyze_nonexistent_note_returns_404() {
     let mut state = build_test_state().await;
     state.anthropic_api_key = "test-key".into();
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "b@test.com").await;
     let (h, v) = bearer(&token);
 
@@ -171,7 +171,7 @@ async fn analyze_nonexistent_note_returns_404() {
 async fn analyze_other_users_note_returns_404() {
     let mut state = build_test_state().await;
     state.anthropic_api_key = "test-key".into();
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
 
     let owner_token = register_and_get_token(&server, "owner@test.com").await;
     let other_token = register_and_get_token(&server, "other@test.com").await;
@@ -187,7 +187,7 @@ async fn analyze_other_users_note_returns_404() {
 }
 
 // ---------------------------------------------------------------------------
-// POST /notes/:id/analyze — with mocked Anthropic API
+// POST /notes/:id/analyze -- with mocked Anthropic API
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -222,7 +222,7 @@ async fn analyze_returns_structured_analysis() {
     // a non-empty API key. Full end-to-end analysis is covered by manual testing.
     let mut state = build_test_state().await;
     state.anthropic_api_key = "mock-key".into();
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "c@test.com").await;
     let (h, v) = bearer(&token);
 
@@ -236,7 +236,7 @@ async fn analyze_returns_structured_analysis() {
 }
 
 // ---------------------------------------------------------------------------
-// Search — returns empty array when no embeddings exist
+// Search -- returns empty array when no embeddings exist
 // ---------------------------------------------------------------------------
 
 // NOTE: This test can only run if a real VOYAGE_API_KEY is available.
@@ -256,7 +256,7 @@ async fn search_with_mock_voyage_url_returns_results() {
     // Without a way to override the Voyage API URL at runtime, we test via
     // the missing-key path (400), confirming the guard works correctly.
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "d@test.com").await;
     let (h, v) = bearer(&token);
 
@@ -266,7 +266,7 @@ async fn search_with_mock_voyage_url_returns_results() {
         .json(&json!({ "query": "rust programming" }))
         .await;
 
-    // voyage_api_key is empty in test state → 400 expected
+    // voyage_api_key is empty in test state -> 400 expected
     assert_eq!(resp.status_code(), 400);
 
     // wiremock served 0 requests (key check failed before HTTP call)

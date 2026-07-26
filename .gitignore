@@ -22,5 +22,10 @@ Thumbs.db
 
 # Claude
 .claude/
+.omc/
 CLAUDE.md
 DEPLOY.md
+
+v0
+docs
+temp

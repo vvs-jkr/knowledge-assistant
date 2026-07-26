@@ -23,13 +23,13 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/chat/sessions", get(list_sessions).post(create_session))
         .route(
-            "/chat/sessions/:id",
+            "/chat/sessions/{id}",
             get(get_session)
                 .patch(rename_session)
                 .delete(delete_session),
         )
         .route(
-            "/chat/sessions/:id/messages",
+            "/chat/sessions/{id}/messages",
             get(list_messages).post(send_message),
         )
 }

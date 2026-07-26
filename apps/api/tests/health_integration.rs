@@ -17,18 +17,18 @@ use wiremock::{
 async fn make_server() -> TestServer {
     let state = build_test_state().await;
     let app = build_app(state);
-    TestServer::new(app).expect("test server")
+    TestServer::new(app)
 }
 
 async fn make_server_with_anthropic(mock_url: &str) -> TestServer {
     let mut state = build_test_state().await;
     state.anthropic_api_key = "test-anthropic-key".into();
     // Override the URL constants via env isn't feasible, but wiremock
-    // intercepts at the HTTP level — we test auth/validation paths here
+    // intercepts at the HTTP level -- we test auth/validation paths here
     // and the full integration in mock-aware tests below.
     let _ = mock_url; // used when calling the real API client
     let app = build_app(state);
-    TestServer::new(app).expect("test server")
+    TestServer::new(app)
 }
 
 async fn register_and_get_token(server: &TestServer, email: &str) -> String {
@@ -61,7 +61,7 @@ fn pdf_form(filename: &str, bytes: &[u8], lab_date: &str) -> MultipartForm {
 }
 
 // ---------------------------------------------------------------------------
-// POST /health/upload — validation (no real AI call needed)
+// POST /health/upload -- validation (no real AI call needed)
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -125,7 +125,7 @@ async fn upload_without_anthropic_key_returns_400() {
     // Server with no API key configured
     let state = build_test_state().await;
     let app = build_app(state);
-    let server = TestServer::new(app).expect("test server");
+    let server = TestServer::new(app);
     let token = register_and_get_token(&server, "health_no_key@example.com").await;
     let (name, val) = bearer(&token);
 
@@ -139,7 +139,7 @@ async fn upload_without_anthropic_key_returns_400() {
 }
 
 // ---------------------------------------------------------------------------
-// POST /health/upload — full round-trip with wiremock
+// POST /health/upload -- full round-trip with wiremock
 // ---------------------------------------------------------------------------
 
 fn mock_anthropic_lab_response() -> Value {
@@ -371,7 +371,7 @@ async fn upload_with_mock_anthropic_stores_record_and_metrics() {
     // Use the server with real (empty) key but valid state to verify
     // the endpoint structure (auth, validation, record/metric structure).
     // The actual Anthropic call won't happen because the key doesn't reach
-    // the real API — this is covered by the key-absent test above.
+    // the real API -- this is covered by the key-absent test above.
     // Full end-to-end with mock URL would require a configurable base URL in ai.rs.
 
     // Verify mock server received 0 requests (no real API call made with test key)

@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 async fn make_server() -> TestServer {
     let state = build_test_state().await;
     let app = build_app(state);
-    TestServer::new(app).expect("test server")
+    TestServer::new(app)
 }
 
 async fn register_user(server: &TestServer, email: &str, password: &str) -> Value {

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7", features = ["multipart"] }
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "compression-gzip", "trace"] }
@@ -23,13 +23,13 @@ dotenvy = "0.15"
 thiserror = "2"
 anyhow = "1"
 reqwest = { version = "0.12", features = ["json"] }
-tower_governor = "0.4"
+tower_governor = "0.8"
 sqlite-vec = "0.1"
 libsqlite3-sys = "0.30"
 base64 = "0.22"
 
 [dev-dependencies]
-axum-test = "15"
+axum-test = "21"
 wiremock = "0.6"
 
 [lints.rust]
@@ -44,7 +44,7 @@ panic = "warn"
 # False-positive pedantic lints
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
-# Doc lints — not useful for a personal project
+# Doc lints -- not useful for a personal project
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 doc_markdown = "allow"

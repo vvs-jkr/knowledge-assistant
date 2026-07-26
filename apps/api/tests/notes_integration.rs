@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 async fn make_server() -> TestServer {
     let state = build_test_state().await;
     let app = build_app(state);
-    TestServer::new(app).expect("test server")
+    TestServer::new(app)
 }
 
 /// Registers a user and returns the access token.
@@ -140,7 +140,7 @@ async fn upload_exceeding_size_limit_is_rejected() {
     let server = make_server().await;
     let token = register_and_get_token(&server, "up4@example.com").await;
 
-    // 11 MiB of data — well above the app's 10 MiB limit.
+    // 11 MiB of data -- well above the app's 10 MiB limit.
     // Axum's 2 MiB default body limit fires before our handler runs, returning 400.
     // We assert that the request is rejected (4xx), not that the exact code is 413.
     let big_content = vec![b'a'; 11 * 1024 * 1024];

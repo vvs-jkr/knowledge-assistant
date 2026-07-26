@@ -27,7 +27,7 @@ fn bearer(token: &str) -> (axum::http::HeaderName, HeaderValue) {
 #[tokio::test]
 async fn create_manual_knowledge_entry_returns_typed_metadata() {
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "knowledge-manual@test.com").await;
     let (h, v) = bearer(&token);
 
@@ -58,7 +58,7 @@ async fn create_manual_knowledge_entry_returns_typed_metadata() {
 #[tokio::test]
 async fn list_knowledge_filters_by_doc_type_and_generation_flag() {
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "knowledge-filter@test.com").await;
     let (h, v) = bearer(&token);
 
@@ -106,7 +106,7 @@ async fn list_knowledge_filters_by_doc_type_and_generation_flag() {
 #[tokio::test]
 async fn upload_knowledge_defaults_to_general_reviewed_entry() {
     let state = build_test_state().await;
-    let server = TestServer::new(build_app(state)).expect("server");
+    let server = TestServer::new(build_app(state));
     let token = register_and_get_token(&server, "knowledge-upload@test.com").await;
     let (h, v) = bearer(&token);
 

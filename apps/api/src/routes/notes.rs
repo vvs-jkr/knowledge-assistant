@@ -26,12 +26,12 @@ pub fn router() -> Router<AppState> {
         .route("/notes/upload", post(upload_note))
         .route("/notes/search", post(search_notes))
         .route(
-            "/notes/:id",
+            "/notes/{id}",
             get(get_note).put(update_note).delete(delete_note),
         )
-        .route("/notes/:id/download", get(download_note))
-        .route("/notes/:id/analyze", post(analyze_note_handler))
-        .route("/notes/:id/improve", post(improve_note_handler))
+        .route("/notes/{id}/download", get(download_note))
+        .route("/notes/{id}/analyze", post(analyze_note_handler))
+        .route("/notes/{id}/improve", post(improve_note_handler))
 }
 
 // ---------------------------------------------------------------------------

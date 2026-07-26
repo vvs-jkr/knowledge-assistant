@@ -4,11 +4,15 @@
   "files": {
     "ignore": [
       "**/.claude/**",
+      "**/.omc/**",
       "**/tsconfig*.json",
       "**/node_modules/**",
       "**/dist/**",
       "**/target/**",
-      "**/.sqlx/**"
+      "**/.sqlx/**",
+      "**/v0/**",
+      "**/docs/**",
+      "**/temp/**"
     ]
   },
   "linter": {

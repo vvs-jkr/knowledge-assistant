@@ -1,4 +1,4 @@
-use axum::{async_trait, extract::FromRequestParts, http::request::Parts};
+use axum::{extract::FromRequestParts, http::request::Parts};
 
 use crate::{
     auth::{verify_access_token, Claims},
@@ -6,10 +6,9 @@ use crate::{
     error::AppError,
 };
 
-// Добавь `AuthUser(claims): AuthUser` в параметры handler'а — и роут становится защищённым.
+// Добавь `AuthUser(claims): AuthUser` в параметры handler'а -- и роут становится защищённым.
 pub struct AuthUser(pub Claims);
 
-#[async_trait]
 impl FromRequestParts<AppState> for AuthUser {
     type Rejection = AppError;
 

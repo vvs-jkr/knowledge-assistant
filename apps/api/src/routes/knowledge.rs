@@ -25,7 +25,7 @@ pub fn router() -> Router<AppState> {
         .route("/knowledge", get(list_knowledge).post(create_knowledge))
         .route("/knowledge/upload", post_upload())
         .route(
-            "/knowledge/:id",
+            "/knowledge/{id}",
             get(get_knowledge).delete(delete_knowledge),
         )
 }
