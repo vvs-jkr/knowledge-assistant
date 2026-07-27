@@ -1,6 +1,9 @@
 ### ── Stage 1: build ────────────────────────────────────────────────────────
 FROM rust:1.88-bookworm AS builder
 
+ARG SOURCE_COMMIT=unknown
+LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
+
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
@@ -24,6 +27,9 @@ RUN cargo build --release
 
 ### ── Stage 2: runtime ──────────────────────────────────────────────────────
 FROM debian:bookworm-slim
+
+ARG SOURCE_COMMIT=unknown
+LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
 
 RUN apt-get update && apt-get install -y \
     libsqlite3-0 \

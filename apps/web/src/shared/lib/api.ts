@@ -8,8 +8,10 @@ declare module 'axios' {
 }
 
 export const api = axios.create({
+  // Production nginx proxies /api to the API container. Local development can
+  // still override this with VITE_API_URL=http://localhost:8080.
   // biome-ignore lint/complexity/useLiteralKeys: noPropertyAccessFromIndexSignature requires bracket notation
-  baseURL: import.meta.env['VITE_API_URL'] ?? 'http://localhost:8080',
+  baseURL: import.meta.env['VITE_API_URL'] || '/api',
   withCredentials: true, // для HttpOnly cookie (refresh token)
 })
 

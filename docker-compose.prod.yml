@@ -3,6 +3,8 @@ services:
     image: ghcr.io/vvs-jkr/knowledge-assistant-api:latest
     build:
       context: ./apps/api
+      args:
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-unknown}
     restart: unless-stopped
     ports:
       - "8181:8080"
@@ -25,12 +27,12 @@ services:
       start_period: 20s
 
   web:
-    image: ghcr.io/vvs-jkr/knowledge-assistant-web:${WEB_IMAGE_TAG:-latest}
+    image: ghcr.io/vvs-jkr/knowledge-assistant-web:latest
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-unknown}
     restart: unless-stopped
     ports:
       - "3000:80"
