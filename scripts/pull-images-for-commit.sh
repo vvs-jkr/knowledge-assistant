@@ -1,7 +1,11 @@
 #!/bin/sh
 set -eu
 
-EXPECTED_COMMIT="${SOURCE_COMMIT:?Coolify must expose SOURCE_COMMIT during deployment}"
+EXPECTED_COMMIT="${SOURCE_COMMIT:-$(git rev-parse HEAD 2>/dev/null || true)}"
+if [ -z "$EXPECTED_COMMIT" ]; then
+  echo "Cannot determine the source commit for this deployment." >&2
+  exit 1
+fi
 TIMEOUT_SECONDS="${IMAGE_WAIT_TIMEOUT_SECONDS:-900}"
 POLL_SECONDS="${IMAGE_WAIT_POLL_SECONDS:-10}"
 
