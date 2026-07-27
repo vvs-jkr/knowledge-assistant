@@ -630,7 +630,7 @@ async fn consult_lab_batch(
     let answer = ai::consult_lab_results(
         &state.http_client,
         &state.anthropic_api_key,
-        &state.anthropic_model,
+        &state.chat_model,
         &lab_context,
         question,
     )

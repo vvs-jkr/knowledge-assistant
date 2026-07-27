@@ -323,7 +323,7 @@ async fn send_message(
     let reply = ai::chat(
         &state.http_client,
         &state.anthropic_api_key,
-        &state.anthropic_model,
+        &state.chat_model,
         &history,
         &training_context,
     )

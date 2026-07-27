@@ -5,6 +5,7 @@ pub struct AppConfig {
     pub encryption_key: String,
     pub anthropic_api_key: String,
     pub anthropic_model: String,
+    pub chat_model: String,
     pub embedding_api_key: String,
     pub frontend_url: String,
     pub port: u16,
@@ -20,6 +21,8 @@ impl AppConfig {
             anthropic_api_key: require_env("ANTHROPIC_API_KEY")?,
             anthropic_model: std::env::var("ANTHROPIC_MODEL")
                 .unwrap_or_else(|_| "anthropic/claude-sonnet-5".into()),
+            chat_model: std::env::var("CHAT_MODEL")
+                .unwrap_or_else(|_| "anthropic/claude-haiku-4.5".into()),
             embedding_api_key: std::env::var("OPENROUTER_API_KEY").unwrap_or_default(),
             frontend_url: std::env::var("FRONTEND_URL")
                 .unwrap_or_else(|_| "http://localhost:5173".into()),
@@ -70,6 +73,7 @@ pub struct AppState {
     pub rate_limit_enabled: bool,
     pub anthropic_api_key: String,
     pub anthropic_model: String,
+    pub chat_model: String,
     pub embedding_api_key: String,
     pub http_client: reqwest::Client,
     pub cookie_secure: bool,
@@ -88,6 +92,7 @@ impl AppState {
                 .unwrap_or(true),
             anthropic_api_key: config.anthropic_api_key.clone(),
             anthropic_model: config.anthropic_model.clone(),
+            chat_model: config.chat_model.clone(),
             embedding_api_key: config.embedding_api_key.clone(),
             http_client: reqwest::Client::new(),
             cookie_secure: config.cookie_secure,

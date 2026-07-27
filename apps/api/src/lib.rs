@@ -72,6 +72,7 @@ pub async fn build_test_state() -> config::AppState {
             encryption_key: "0".repeat(64),
             anthropic_api_key: String::new(),
             anthropic_model: "claude-sonnet-5".into(),
+            chat_model: "claude-haiku-4.5".into(),
             embedding_api_key: String::new(),
             frontend_url: "http://localhost:5173".into(),
             port: 8080,
