@@ -15,4 +15,5 @@ fi
 export SOURCE_COMMIT
 
 docker compose --env-file /artifacts/build-time.env -f docker-compose.prod.yml build --pull
-docker compose --env-file /artifacts/build-time.env -f docker-compose.prod.yml push
+docker push ghcr.io/vvs-jkr/knowledge-assistant-api:latest
+docker push ghcr.io/vvs-jkr/knowledge-assistant-web:latest
