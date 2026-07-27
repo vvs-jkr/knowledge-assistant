@@ -1,7 +1,12 @@
 #!/bin/sh
 set -eu
 
-EXPECTED_COMMIT="${SOURCE_COMMIT:-$(git rev-parse HEAD 2>/dev/null || true)}"
+SOURCE_REPOSITORY="${SOURCE_REPOSITORY:-https://github.com/vvs-jkr/knowledge-assistant.git}"
+SOURCE_BRANCH="${SOURCE_BRANCH:-main}"
+EXPECTED_COMMIT="${SOURCE_COMMIT:-}"
+if [ -z "$EXPECTED_COMMIT" ] || [ "$EXPECTED_COMMIT" = "unknown" ]; then
+  EXPECTED_COMMIT="$(git ls-remote "$SOURCE_REPOSITORY" "refs/heads/$SOURCE_BRANCH" 2>/dev/null | awk 'NR == 1 { print $1 }')"
+fi
 if [ -z "$EXPECTED_COMMIT" ]; then
   echo "Cannot determine the source commit for this deployment." >&2
   exit 1
