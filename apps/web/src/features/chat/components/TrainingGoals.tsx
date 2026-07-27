@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useTrainingGoals, useUpdateTrainingGoals } from '@/features/chat/api/chat.api'
 import type { WorkoutAnalysis } from '@/features/workouts/api/workouts.api'
 import { useQueryClient } from '@tanstack/react-query'
+import { Target } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export function TrainingGoals() {
@@ -47,11 +48,16 @@ export function TrainingGoals() {
   const hasAnalysis = qc.getQueryData(['workouts', 'analysis']) !== undefined
 
   return (
-    <div className="space-y-2 border-t px-3 py-3">
+    <div className="m-2 space-y-2 rounded-xl border bg-card/75 p-3 shadow-sm">
       <div className="flex items-center justify-between">
-        <Label htmlFor="goals-active" className="text-xs font-medium">
-          Цели тренировок
-        </Label>
+        <div className="flex items-center gap-2">
+          <div className="grid h-6 w-6 place-items-center rounded-lg bg-accent text-accent-foreground">
+            <Target className="h-3.5 w-3.5" />
+          </div>
+          <Label htmlFor="goals-active" className="text-xs font-medium">
+            Цели тренировок
+          </Label>
+        </div>
         <Switch
           id="goals-active"
           checked={active}
@@ -65,7 +71,7 @@ export function TrainingGoals() {
         onChange={(e) => setText(e.target.value)}
         onBlur={handleBlur}
         placeholder="Опиши свои цели и слабые стороны..."
-        className="min-h-[72px] resize-none text-xs"
+        className="min-h-[72px] resize-none rounded-xl border-0 bg-secondary/55 text-xs shadow-none focus-visible:ring-1"
         disabled={!active || updateGoals.isPending}
       />
 

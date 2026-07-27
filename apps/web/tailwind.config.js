@@ -4,6 +4,10 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Aptos', 'Trebuchet MS', 'sans-serif'],
+        display: ['Aptos Display', 'Trebuchet MS', 'sans-serif'],
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',

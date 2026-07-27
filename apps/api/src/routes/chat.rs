@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::get,
+    routing::{get, patch, post},
     Json, Router,
 };
 use sqlx::Row as _;
@@ -31,6 +31,14 @@ pub fn router() -> Router<AppState> {
         .route(
             "/chat/sessions/{id}/messages",
             get(list_messages).post(send_message),
+        )
+        .route(
+            "/chat/sessions/{id}/messages/{message_id}",
+            patch(edit_message),
+        )
+        .route(
+            "/chat/sessions/{id}/messages/{message_id}/regenerate",
+            post(regenerate_message),
         )
 }
 
@@ -222,7 +230,7 @@ async fn list_messages(
 
     let rows = sqlx::query(
         "SELECT id, session_id, role, content, created_at FROM chat_messages \
-         WHERE session_id = ? ORDER BY created_at ASC",
+         WHERE session_id = ? ORDER BY rowid ASC",
     )
     .bind(&id)
     .fetch_all(&state.db)
@@ -302,7 +310,7 @@ async fn send_message(
     // Load full conversation history for the AI.
     let history_rows = sqlx::query(
         "SELECT role, content FROM chat_messages \
-         WHERE session_id = ? ORDER BY created_at ASC",
+         WHERE session_id = ? ORDER BY rowid ASC",
     )
     .bind(&session_id)
     .fetch_all(&state.db)
@@ -378,6 +386,240 @@ async fn send_message(
         content: reply,
         created_at: reply_time,
     }))
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /chat/sessions/:id/messages/:message_id
+// ---------------------------------------------------------------------------
+
+#[allow(clippy::too_many_lines)]
+async fn edit_message(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path((session_id, message_id)): Path<(String, String)>,
+    Json(body): Json<SendMessageRequest>,
+) -> ApiResult<Json<ChatMessage>> {
+    ensure_chat_configured(&state)?;
+
+    let content = body.content.trim().to_owned();
+    if content.is_empty() {
+        return Err(AppError::BadRequest("Message cannot be empty".into()));
+    }
+
+    let target = sqlx::query(
+        "SELECT cm.rowid AS message_rowid, cm.role \
+         FROM chat_messages cm \
+         JOIN chat_sessions cs ON cs.id = cm.session_id \
+         WHERE cm.id = ? AND cm.session_id = ? AND cs.user_id = ?",
+    )
+    .bind(&message_id)
+    .bind(&session_id)
+    .bind(&claims.sub)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?
+    .ok_or(AppError::NotFound)?;
+
+    let target_rowid: i64 = target.try_get("message_rowid").map_err(AppError::from)?;
+    let role: String = target.try_get("role").map_err(AppError::from)?;
+    if role != "user" {
+        return Err(AppError::BadRequest(
+            "Only user messages can be edited".into(),
+        ));
+    }
+
+    let history_rows = sqlx::query(
+        "SELECT rowid AS message_rowid, role, content FROM chat_messages \
+         WHERE session_id = ? AND rowid <= ? ORDER BY rowid ASC",
+    )
+    .bind(&session_id)
+    .bind(target_rowid)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let history = history_rows
+        .iter()
+        .map(|row| -> ApiResult<ChatTurn> {
+            let rowid: i64 = row.try_get("message_rowid").map_err(AppError::from)?;
+            Ok(ChatTurn {
+                role: row.try_get("role").map_err(AppError::from)?,
+                content: if rowid == target_rowid {
+                    content.clone()
+                } else {
+                    row.try_get("content").map_err(AppError::from)?
+                },
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    let reply = generate_reply(&state, &claims.sub, &content, &history).await?;
+    let assistant = replace_branch(
+        &state,
+        &session_id,
+        target_rowid,
+        Some((&message_id, &content)),
+        &reply,
+    )
+    .await?;
+
+    Ok(Json(assistant))
+}
+
+// ---------------------------------------------------------------------------
+// POST /chat/sessions/:id/messages/:message_id/regenerate
+// ---------------------------------------------------------------------------
+
+async fn regenerate_message(
+    AuthUser(claims): AuthUser,
+    State(state): State<AppState>,
+    Path((session_id, message_id)): Path<(String, String)>,
+) -> ApiResult<Json<ChatMessage>> {
+    ensure_chat_configured(&state)?;
+
+    let target = sqlx::query(
+        "SELECT cm.rowid AS message_rowid, cm.role \
+         FROM chat_messages cm \
+         JOIN chat_sessions cs ON cs.id = cm.session_id \
+         WHERE cm.id = ? AND cm.session_id = ? AND cs.user_id = ?",
+    )
+    .bind(&message_id)
+    .bind(&session_id)
+    .bind(&claims.sub)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(AppError::from)?
+    .ok_or(AppError::NotFound)?;
+
+    let target_rowid: i64 = target.try_get("message_rowid").map_err(AppError::from)?;
+    let role: String = target.try_get("role").map_err(AppError::from)?;
+    if role != "assistant" {
+        return Err(AppError::BadRequest(
+            "Only assistant messages can be regenerated".into(),
+        ));
+    }
+
+    let history_rows = sqlx::query(
+        "SELECT role, content FROM chat_messages \
+         WHERE session_id = ? AND rowid < ? ORDER BY rowid ASC",
+    )
+    .bind(&session_id)
+    .bind(target_rowid)
+    .fetch_all(&state.db)
+    .await
+    .map_err(AppError::from)?;
+
+    let history = history_rows
+        .iter()
+        .map(|row| -> ApiResult<ChatTurn> {
+            Ok(ChatTurn {
+                role: row.try_get("role").map_err(AppError::from)?,
+                content: row.try_get("content").map_err(AppError::from)?,
+            })
+        })
+        .collect::<ApiResult<Vec<_>>>()?;
+
+    let query = history
+        .iter()
+        .rev()
+        .find(|turn| turn.role == "user")
+        .map(|turn| turn.content.as_str())
+        .ok_or_else(|| AppError::BadRequest("No user message to regenerate from".into()))?;
+
+    let reply = generate_reply(&state, &claims.sub, query, &history).await?;
+    let assistant = replace_branch(&state, &session_id, target_rowid, None, &reply).await?;
+
+    Ok(Json(assistant))
+}
+
+fn ensure_chat_configured(state: &AppState) -> ApiResult<()> {
+    if state.anthropic_api_key.is_empty() {
+        return Err(AppError::BadRequest(
+            "Chat is not configured (missing ANTHROPIC_API_KEY)".into(),
+        ));
+    }
+    Ok(())
+}
+
+async fn generate_reply(
+    state: &AppState,
+    user_id: &str,
+    query: &str,
+    history: &[ChatTurn],
+) -> ApiResult<String> {
+    let training_context = build_training_context(state, user_id, query).await?;
+    ai::chat(
+        &state.http_client,
+        &state.anthropic_api_key,
+        &state.chat_model,
+        history,
+        &training_context,
+    )
+    .await
+}
+
+async fn replace_branch(
+    state: &AppState,
+    session_id: &str,
+    target_rowid: i64,
+    edited_message: Option<(&str, &str)>,
+    reply: &str,
+) -> ApiResult<ChatMessage> {
+    let assistant_msg_id = format!("{:032x}", uuid::Uuid::new_v4().as_u128());
+    let reply_time = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let mut tx = state.db.begin().await.map_err(AppError::from)?;
+
+    if let Some((message_id, content)) = edited_message {
+        sqlx::query("UPDATE chat_messages SET content = ? WHERE id = ? AND session_id = ?")
+            .bind(content)
+            .bind(message_id)
+            .bind(session_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+        sqlx::query("DELETE FROM chat_messages WHERE session_id = ? AND rowid > ?")
+            .bind(session_id)
+            .bind(target_rowid)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+    } else {
+        sqlx::query("DELETE FROM chat_messages WHERE session_id = ? AND rowid >= ?")
+            .bind(session_id)
+            .bind(target_rowid)
+            .execute(&mut *tx)
+            .await
+            .map_err(AppError::from)?;
+    }
+
+    sqlx::query(
+        "INSERT INTO chat_messages (id, session_id, role, content, created_at) \
+         VALUES (?, ?, 'assistant', ?, ?)",
+    )
+    .bind(&assistant_msg_id)
+    .bind(session_id)
+    .bind(reply)
+    .bind(&reply_time)
+    .execute(&mut *tx)
+    .await
+    .map_err(AppError::from)?;
+
+    sqlx::query("UPDATE chat_sessions SET updated_at = ? WHERE id = ?")
+        .bind(&reply_time)
+        .bind(session_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+
+    tx.commit().await.map_err(AppError::from)?;
+
+    Ok(ChatMessage {
+        id: assistant_msg_id,
+        session_id: session_id.to_owned(),
+        role: "assistant".into(),
+        content: reply.to_owned(),
+        created_at: reply_time,
+    })
 }
 
 /// Build training context string from cached workout analysis + KNN workout search + recent health metrics.

@@ -34,6 +34,16 @@ const chatApi = {
       .post<ChatMessage>(`/chat/sessions/${sessionId}/messages`, { content })
       .then((r) => chatMessageSchema.parse(r.data)),
 
+  editMessage: (sessionId: string, messageId: string, content: string): Promise<ChatMessage> =>
+    api
+      .patch<ChatMessage>(`/chat/sessions/${sessionId}/messages/${messageId}`, { content })
+      .then((r) => chatMessageSchema.parse(r.data)),
+
+  regenerateMessage: (sessionId: string, messageId: string): Promise<ChatMessage> =>
+    api
+      .post<ChatMessage>(`/chat/sessions/${sessionId}/messages/${messageId}/regenerate`)
+      .then((r) => chatMessageSchema.parse(r.data)),
+
   getTrainingGoals: (): Promise<TrainingGoals> =>
     api.get<TrainingGoals>('/training-goals').then((r) => trainingGoalsSchema.parse(r.data)),
 
@@ -118,6 +128,28 @@ export function useSendMessage(sessionId: string) {
         (prev ?? []).filter((m) => !m.id.startsWith('temp-'))
       )
     },
+  })
+}
+
+function invalidateChat(qc: ReturnType<typeof useQueryClient>, sessionId: string) {
+  qc.invalidateQueries({ queryKey: ['chat', 'messages', sessionId] })
+  qc.invalidateQueries({ queryKey: ['chat', 'sessions'] })
+}
+
+export function useEditMessage(sessionId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
+      chatApi.editMessage(sessionId, messageId, content),
+    onSettled: () => invalidateChat(qc, sessionId),
+  })
+}
+
+export function useRegenerateMessage(sessionId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (messageId: string) => chatApi.regenerateMessage(sessionId, messageId),
+    onSettled: () => invalidateChat(qc, sessionId),
   })
 }
 

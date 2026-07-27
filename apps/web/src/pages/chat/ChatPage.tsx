@@ -55,8 +55,11 @@ export function ChatPage() {
   }, [])
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
-      <aside className="relative flex shrink-0 flex-col border-r" style={{ width: sidebarWidth }}>
+    <div className="flex h-full w-full overflow-hidden bg-card">
+      <aside
+        className="relative flex shrink-0 flex-col border-r bg-secondary/35"
+        style={{ width: sidebarWidth }}
+      >
         <div className="min-h-0 flex-1 overflow-hidden">
           <ChatSessionList
             sessions={sessions}
@@ -66,17 +69,20 @@ export function ChatPage() {
         </div>
         <TrainingGoals />
         <div
-          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/40 active:bg-primary/60"
+          className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize transition-colors hover:bg-primary/15 active:bg-primary/25"
           onMouseDown={onMouseDown}
         />
       </aside>
 
-      <main className="flex flex-1 flex-col overflow-hidden">
+      <main className="flex flex-1 flex-col overflow-hidden bg-card">
         {activeSessionId !== null ? (
           <ChatWindow sessionId={activeSessionId} />
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Выбери чат или создай новый
+          <div className="chat-texture flex flex-1 items-center justify-center p-8 text-center">
+            <div>
+              <p className="font-display text-lg font-semibold">Нет открытого диалога</p>
+              <p className="mt-1 text-sm text-muted-foreground">Выбери чат слева или создай новый</p>
+            </div>
           </div>
         )}
       </main>

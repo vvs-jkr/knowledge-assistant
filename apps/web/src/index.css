@@ -4,60 +4,106 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 217 91% 60%;
+    --background: 42 36% 95%;
+    --foreground: 157 28% 12%;
+    --card: 45 33% 98%;
+    --card-foreground: 157 28% 12%;
+    --popover: 45 33% 98%;
+    --popover-foreground: 157 28% 12%;
+    --primary: 158 52% 25%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 43 27% 91%;
+    --secondary-foreground: 157 28% 15%;
+    --muted: 42 23% 91%;
+    --muted-foreground: 156 10% 42%;
+    --accent: 71 78% 68%;
+    --accent-foreground: 157 36% 14%;
+    --destructive: 4 70% 52%;
     --destructive-foreground: 0 0% 98%;
-    --success: 160 84% 39%;
+    --success: 157 55% 35%;
     --success-foreground: 0 0% 100%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 217 91% 60%;
-    --chart-1: 217 91% 60%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    --border: 151 13% 84%;
+    --input: 151 13% 79%;
+    --ring: 158 52% 25%;
+    --chart-1: 158 52% 25%;
+    --chart-2: 71 67% 49%;
+    --chart-3: 28 84% 57%;
+    --chart-4: 185 42% 38%;
+    --chart-5: 8 62% 57%;
+    --radius: 0.75rem;
   }
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 9% 5.5%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 9% 8%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84% 60%;
+    --background: 156 24% 8%;
+    --foreground: 45 28% 92%;
+    --card: 156 21% 11%;
+    --card-foreground: 45 28% 92%;
+    --popover: 156 20% 13%;
+    --popover-foreground: 45 28% 92%;
+    --primary: 72 72% 61%;
+    --primary-foreground: 157 38% 10%;
+    --secondary: 155 15% 18%;
+    --secondary-foreground: 45 28% 92%;
+    --muted: 155 15% 17%;
+    --muted-foreground: 145 9% 64%;
+    --accent: 72 56% 28%;
+    --accent-foreground: 71 76% 83%;
+    --destructive: 4 66% 52%;
     --destructive-foreground: 0 0% 98%;
-    --success: 160 84% 39%;
-    --success-foreground: 0 0% 100%;
-    --border: 240 6% 12%;
-    --input: 240 6% 12%;
-    --ring: 217 91% 60%;
-    --chart-1: 217 91% 60%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --success: 151 57% 48%;
+    --success-foreground: 157 38% 8%;
+    --border: 154 13% 21%;
+    --input: 154 13% 26%;
+    --ring: 72 72% 61%;
+    --chart-1: 72 72% 61%;
+    --chart-2: 151 57% 48%;
+    --chart-3: 28 82% 61%;
+    --chart-4: 185 48% 53%;
+    --chart-5: 8 70% 63%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-feature-settings: 'ss01' 1, 'cv02' 1;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+
+  ::selection {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+}
+
+@layer utilities {
+  .app-canvas {
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(circle at 14% 8%, hsl(70 76% 70% / 0.16), transparent 24rem),
+      radial-gradient(circle at 92% 90%, hsl(27 84% 62% / 0.1), transparent 28rem);
+  }
+
+  .chat-texture {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.065) 0.65px, transparent 0.65px);
+    background-size: 18px 18px;
+  }
+
+  .fade-rise {
+    animation: fade-rise 320ms ease-out both;
+  }
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

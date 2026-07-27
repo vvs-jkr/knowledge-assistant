@@ -13,14 +13,13 @@ export function AppLayout() {
   const { helpOpen, setHelpOpen } = useGlobalShortcuts()
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="app-canvas flex h-screen overflow-hidden bg-background">
       <AppSidebar collapsed={collapsed} onToggle={toggleSidebar} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AppHeader />
-        <main className="flex flex-1 overflow-hidden">
+        <main className="mx-2 mb-2 flex flex-1 overflow-hidden rounded-2xl border bg-card/95 shadow-[0_18px_60px_-34px_hsl(var(--foreground)/0.38)] backdrop-blur-sm md:mx-4 md:mb-4">
           <Outlet />
         </main>
-        <div className="h-4 shrink-0" />
       </div>
       <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>

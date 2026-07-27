@@ -64,35 +64,38 @@ export function ChatSessionList({ sessions, activeId, onSelect }: Props) {
   return (
     <>
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b px-3 py-2">
-          <span className="text-sm font-medium">Чаты</span>
+        <div className="space-y-3 px-3 pb-3 pt-4">
+          <div>
+            <p className="font-display text-base font-semibold">Диалоги</p>
+            <p className="text-[11px] text-muted-foreground">История работы с ассистентом</p>
+          </div>
           <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
+            size="sm"
+            className="h-9 w-full justify-start rounded-xl shadow-sm"
             onClick={handleCreate}
             disabled={createSession.isPending}
             title="Новый чат"
           >
             <MessageSquarePlus className="h-4 w-4" />
+            Новый чат
           </Button>
         </div>
 
-        <div className="flex-1 overflow-auto p-1">
+        <div className="flex-1 overflow-auto px-2 pb-3">
           {sessions.length === 0 && (
-            <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-              Нет чатов. Создай первый!
-            </p>
+            <div className="mx-1 rounded-xl border border-dashed bg-card/40 px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Здесь появится история диалогов</p>
+            </div>
           )}
 
           {sessions.map((s) => (
             <div
               key={s.id}
               className={cn(
-                'group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm',
+                'group mb-1 flex min-h-10 items-center gap-1 rounded-xl border border-transparent px-3 py-2 text-sm transition-all',
                 activeId === s.id
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ? 'border-border bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:bg-card/65 hover:text-foreground'
               )}
             >
               {editingId === s.id ? (
@@ -118,7 +121,7 @@ export function ChatSessionList({ sessions, activeId, onSelect }: Props) {
                 </button>
               )}
 
-              <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100">
+              <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                 <Button
                   variant="ghost"
                   size="icon"
